@@ -14,11 +14,14 @@ private:
     SocketGuard epollSocket;
     epoll_event configEvent;
     std::vector<epoll_event> client_events;
-    std::unordered_map<int, std::string> client_buffers;
+
+    std::unordered_map<uint32_t, char> IP_MAP;
 
     int port = -1;
     int max_listen_event = -1;
     int max_epoll_event = -1;
+    int max_client_per_ip = 0;
+    int max_client = 0;
 
     // Thread
     int worker_id = -1;
@@ -96,12 +99,14 @@ private:
     }
     void AcceptNewClient()
     {
+        sockaddr_in clientAddr;
+        socklen_t clientAddrLen = sizeof(clientAddr);
         while (true)
         {
             /*
                 Khi ông nhận accept hệ điều hành sẽ tạo fd cho kết nối đó
             */
-            int client_fd = accept(serverSocket.GetSocketfd(), NULL, NULL);
+            int client_fd = accept(serverSocket.GetSocketfd(), (sockaddr *)&clientAddr, &clientAddrLen);
 
             if (client_fd < 0)
             {
@@ -114,10 +119,16 @@ private:
 
                 break;
             }
+            if (IP_MAP[clientAddr.sin_addr.s_addr] >= max_client_per_ip)
+            {
+                close(client_fd);
+                continue;
+            }
             set_nonblocking(client_fd);
             struct epoll_event client_ev;
             client_ev.events = EPOLLIN | EPOLLET;
             client_ev.data.fd = client_fd;
+
             if (epoll_ctl(epollSocket.GetSocketfd(), EPOLL_CTL_ADD, client_fd, &client_ev) < 0)
             {
                 std::cerr << "Epoll ctl add client failed: " << worker_id << " errno=" << errno << '\n';
@@ -127,130 +138,23 @@ private:
         }
     }
 
-    void CloseClient(int client_fd)
-    {
-        epoll_ctl(epollSocket.GetSocketfd(), EPOLL_CTL_DEL, client_fd, nullptr);
-        client_buffers.erase(client_fd);
-        close(client_fd);
-    }
-
-    bool SendAll(int fd, const std::string &data)
-    {
-        size_t totalSent = 0;
-        while (totalSent < data.size())
-        {
-            ssize_t sent = send(fd, data.data() + totalSent, data.size() - totalSent, 0);
-            if (sent < 0)
-            {
-                if (errno == EINTR)
-                {
-                    continue;
-                }
-                if (errno == EAGAIN || errno == EWOULDBLOCK)
-                {
-                    continue;
-                }
-                return false;
-            }
-            if (sent == 0)
-            {
-                return false;
-            }
-            totalSent += static_cast<size_t>(sent);
-        }
-        return true;
-    }
-
     std::string BuildHttpResponse(const HttpRequest &request)
     {
-        std::string path = request.path;
-        if (path.empty() || path == "/")
-        {
-            path = "index.html";
-        }
-        else if (path.front() == '/')
-        {
-            path.erase(0, 1);
-        }
-
-        if (path.empty() || path.find("..") != std::string::npos)
-        {
-            path = "index.html";
-        }
-
-        std::ifstream file(path, std::ios::binary);
-        std::string content;
-        bool found = false;
-        if (file)
-        {
-            std::ostringstream ss;
-            ss << file.rdbuf();
-            content = ss.str();
-            found = true;
-        }
-
-        std::string status = found ? "200 OK" : "404 Not Found";
-        std::string contentType = "text/plain";
-        if (path.size() >= 5 && path.substr(path.size() - 5) == ".html")
-        {
-            contentType = "text/html";
-        }
-        else if (path.size() >= 4 && path.substr(path.size() - 4) == ".css")
-        {
-            contentType = "text/css";
-        }
-
-        std::string response = "HTTP/1.1 " + status + "\r\n";
-        response += "Content-Type: " + contentType + "\r\n";
-        response += "Content-Length: " + std::to_string(content.size()) + "\r\n";
-        response += "Connection: close\r\n";
-        response += "\r\n";
-        response += content;
-        return response;
     }
 
     void HandleRequest(int fd)
     {
-        char buffer[4096];
-        while (true)
-        {
-            ssize_t bytesRead = read(fd, buffer, sizeof(buffer));
-            if (bytesRead < 0)
-            {
-                if (errno == EAGAIN || errno == EWOULDBLOCK)
-                {
-                    break;
-                }
-                CloseClient(fd);
-                return;
-            }
-            if (bytesRead == 0)
-            {
-                CloseClient(fd);
-                return;
-            }
-            client_buffers[fd].append(buffer, static_cast<size_t>(bytesRead));
-        }
-
-        size_t consumed = 0;
-        HttpRequest request;
-        if (!parseHttpRequest(client_buffers[fd], request, consumed))
-        {
-            return;
-        }
-
-        const std::string response = BuildHttpResponse(request);
-        SendAll(fd, response);
-        CloseClient(fd);
     }
 
 public:
-    Worker(int workerid, int port, int max_listen_event, int max_epoll_event)
+    Worker(int workerid, int port, int max_listen_event, int max_epoll_event, int max_client_per_ip, int max_client)
     {
         this->worker_id = workerid;
         this->port = port;
         this->max_listen_event = max_listen_event;
         this->max_epoll_event = max_epoll_event;
+        this->max_client_per_ip = max_client_per_ip;
+        this->max_client = max_client;
         SetupSocket();
     }
     void StartWorker()
