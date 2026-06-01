@@ -5,7 +5,6 @@ Worker::Worker(int id, int max_events, int max_client)
 {
     epollSocket.SetSocketfd(epoll_create1(0));
     client_events.resize(max_epoll_event);
-    std::cout << "[Worker " << worker_id << "] Khởi tạo thành công.\n";
 }
 
 void Worker::AddClient(int client_fd)
@@ -20,7 +19,7 @@ void Worker::AddClient(int client_fd)
         int old_fd = lru.oldestKey();
         if (old_fd != -1)
         {
-            std::cout << "[Worker " << worker_id << "] LRU đầy, đóng FD cũ: " << old_fd << "\n";
+
             epoll_ctl(epollSocket.GetSocketfd(), EPOLL_CTL_DEL, old_fd, nullptr);
             close(old_fd);
             lru.remove(old_fd);
@@ -46,7 +45,7 @@ void Worker::AddClient(int client_fd)
 
 void Worker::StartWorker()
 {
-    std::cout << "[Worker " << worker_id << "] Bắt đầu vòng lặp xử lý.\n";
+
     while (true)
     {
         int cnt = epoll_wait(epollSocket.GetSocketfd(), client_events.data(), max_epoll_event, -1);
