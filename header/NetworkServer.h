@@ -18,7 +18,7 @@ private:
     std::vector<std::thread> threads;
     int next_worker{0};
 
-    void SetupNetwork();
+        void SetupNetwork();
     void AcceptClient();
 
 public:
