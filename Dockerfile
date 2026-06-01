@@ -19,7 +19,7 @@ FROM alpine:3.20
 RUN apk add --no-cache libstdc++
 
 WORKDIR /app
-COPY --from=builder /app/build/server .
+COPY --from=builder /app/build/webserver .
 
 EXPOSE 8080
 CMD ["./webserver"]
