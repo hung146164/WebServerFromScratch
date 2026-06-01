@@ -79,7 +79,7 @@ void Worker::StartWorker()
 // Test
 char global_test_buffer[8192];
 
-void Test(int fd)
+void Worker::Test(int fd)
 {
     // 1. Đọc dữ liệu (Chỉ đọc để clear buffer của OS, không xử lý)
     ssize_t bytes_received = recv(fd, global_test_buffer, sizeof(global_test_buffer), 0);

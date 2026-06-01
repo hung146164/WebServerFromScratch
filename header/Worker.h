@@ -24,4 +24,5 @@ public:
     void StartWorker();
     void HandleRequest(HttpRequest *request);
     int getConnCount();
+    void Test(int fd);
 };
