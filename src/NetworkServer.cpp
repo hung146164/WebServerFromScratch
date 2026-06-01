@@ -1,4 +1,4 @@
-#include "header/NetworkServer.h"
+#include "NetworkServer.h"
 NetworkServer::NetworkServer()
 {
     serverSocket.SetSocketfd(socket(AF_INET, SOCK_STREAM, 0));
@@ -11,7 +11,7 @@ NetworkServer::NetworkServer()
     // 1. Khởi tạo 16 Workers
     for (int i = 0; i < NUMBER_OF_WORKER; ++i)
     {
-        Worker<ClientDetail<ParseState>> *w = new Worker<ClientDetail<ParseState>>(i, MAX_EVENTS, CLIENT_PER_THREAD);
+        Worker *w = new Worker(i, MAX_EVENTS, CLIENT_PER_THREAD);
         worker_instances.push_back(w);
     }
     newClients.resize(MAX_EVENTS);
@@ -107,7 +107,7 @@ void NetworkServer::Start()
     // Chạy luồng cho từng Worker
     for (int i = 0; i < NUMBER_OF_WORKER; ++i)
     {
-        threads.emplace_back(&Worker<ClientDetail<ParseState>>::StartWorker, worker_instances[i]);
+        threads.emplace_back(&Worker::StartWorker, worker_instances[i]);
     }
 
     std::cout << "[Server] Listening on port " << PORT << " with " << NUMBER_OF_WORKER << " threads.\n";

@@ -1,4 +1,4 @@
-#include "header/NetworkServer.h"
+#include "NetworkServer.h"
 
 int main()
 {

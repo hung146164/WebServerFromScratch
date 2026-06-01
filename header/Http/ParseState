@@ -1,0 +1,11 @@
+#pragma once
+#include "CppConfig.h"
+
+enum class ParseState
+{
+    READING_REQUEST_LINE,
+    READING_HEADER,
+    READING_BODY,
+    COMPLETE,
+    ERROR
+};

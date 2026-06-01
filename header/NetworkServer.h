@@ -12,7 +12,7 @@ class NetworkServer
 private:
     SocketGuard serverSocket;
     SocketGuard epollSocket;
-    std::vector<Worker<ClientDetail<ParseState>> *> worker_instances;
+    std::vector<Worker *> worker_instances;
     std::vector<epoll_event> newClients;
     std::vector<std::thread> threads;
     int next_worker{0};
