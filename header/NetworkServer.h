@@ -9,6 +9,7 @@
 
 class NetworkServer
 {
+
 private:
     SocketGuard serverSocket;
     SocketGuard epollSocket;
