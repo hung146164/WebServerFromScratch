@@ -81,21 +81,36 @@ char global_test_buffer[8192];
 
 void Worker::Test(int fd)
 {
-    // 1. Đọc dữ liệu (Chỉ đọc để clear buffer của OS, không xử lý)
-    ssize_t bytes_received = recv(fd, global_test_buffer, sizeof(global_test_buffer), 0);
-
-    if (bytes_received > 0)
+    while (true)
     {
-        // 2. Gửi phản hồi HTTP tối giản để Bot nhận được 200 OK
-        const char *response =
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/plain\r\n"
-            "Content-Length: 13\r\n"
-            "Connection: keep-alive\r\n"
-            "\r\n"
-            "Hello Viettel!";
+        ssize_t bytes_received = recv(fd, global_test_buffer, sizeof(global_test_buffer), 0);
 
-        send(fd, response, strlen(response), 0);
+        if (bytes_received > 0)
+        {
+            const char *response =
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/plain\r\n"
+                "Content-Length: 13\r\n"
+                "Connection: keep-alive\r\n"
+                "\r\n"
+                "Hello Viettel!";
+            send(fd, response, strlen(response), 0);
+            // Với HTTP/1.1 đơn giản, đọc xong 1 lần có thể thoát nếu bạn chắc chắn client chỉ gửi 1 request/packet
+        }
+        else if (bytes_received == -1)
+        {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                break; // Đã đọc hết dữ liệu hiện có trong buffer OS
+            }
+            // Lỗi thực sự
+            return;
+        }
+        else
+        {
+            // Client đóng kết nối
+            return;
+        }
     }
 }
 

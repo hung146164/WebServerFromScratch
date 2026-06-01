@@ -34,6 +34,15 @@ private:
     int capacity = 0;
     ObjectPool<Node> pool;
 
+    LRUClient()
+    {
+        for (int i = 0; i < 1000; i++)
+        {
+            Node *node = new Node();
+            pool.release(node);
+        }
+    }
+
     void detach(Node *node)
     {
         if (node->pre)
@@ -125,7 +134,7 @@ public:
     {
         return cnt == capacity;
     }
-    bool oldestKey()
+    int oldestKey()
     {
         return tail->key;
     }
