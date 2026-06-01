@@ -1,4 +1,6 @@
-#include "Network_Common.h"
+#pragma once
+
+#include "CppConfig.h"
 
 class SocketGuard
 {
@@ -15,7 +17,7 @@ public:
     }
     void SetSocketfd(int fd_)
     {
-        fd = fd;
+        fd = fd_;
     }
     int GetSocketfd()
     {

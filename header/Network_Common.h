@@ -1,25 +1,8 @@
 #pragma once
 
-#include <cstring>
-#include <iostream>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <string>
-#include <vector>
-#include <sys/epoll.h>
-#include <cstring>
-#include <thread>
-#include <chrono>
-#include <cstdlib>
-#include <fcntl.h>
-#include <map>
-#include <numeric>
-#include <algorithm>
-#include <cmath>
+#include "CppConfig.h"
 
-void set_nonblocking(int fd)
+inline void set_nonblocking(int fd)
 {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags == -1)
