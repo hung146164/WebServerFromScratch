@@ -9,30 +9,15 @@
 #include <chrono>
 #include <cstring>
 #include <algorithm>
-#include <random>
 
 using namespace std;
 using namespace std::chrono;
 
 // --- Cấu hình ---
-const char *SERVER_IP = "104.248.150.184";
+const char *SERVER_IP = "YOUR_SERVER_IP"; // Thay bằng IP server Singapore
 const int SERVER_PORT = 8080;
-const int TOTAL_CONNECTIONS = 500; // Giảm số lượng xuống một chút để tập trung vào test Logic Parser
-
-// Kho "vũ khí" Chaos (Các loại payload dị biệt)
-const vector<string> CHAOS_PAYLOADS = {
-    // 1. Gói chuẩn chỉ
-    "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n",
-
-    // 2. Dính lẹo (Pipelining): 3 Request dính liền nhau trong 1 lần gửi.
-    // Yêu cầu Parser phải cắt đủ 3 lần trong 1 vòng while(true).
-    "GET /1 HTTP/1.1\r\n\r\nGET /2 HTTP/1.1\r\n\r\nPOST /3 HTTP/1.1\r\nContent-Length: 0\r\n\r\n",
-
-    // 3. Đột biến Header: Viết hoa thường lộn xộn, thừa dấu cách.
-    "pOsT /api HtTp/1.1\r\nhOsT:   localhost  \r\nCoNtEnT-LeNgTh: 0\r\n\r\n",
-
-    // 4. Gói tin độc hại: Báo Content-Length cực lớn để lừa server xin RAM (OOM)
-    "PUT /hack HTTP/1.1\r\nContent-Length: 9999999999\r\n\r\n"};
+const int TOTAL_CONNECTIONS = 1000; // Số lượng bot kết nối song song
+const char *PAYLOAD = "GET /test HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n";
 
 struct ConnCtx
 {
@@ -49,40 +34,45 @@ void set_nonblocking(int fd)
 int main()
 {
     int epoll_fd = epoll_create1(0);
-    vector<ConnCtx *> contexts;
-    int success_count = 0;
-    int error_count = 0; // Đếm số lần server ngắt kết nối do crash hoặc lỗi
+    if (epoll_fd == -1)
+        return 1;
 
-    cout << "🌪️ Khởi động CHAOS BOT. Bắn " << TOTAL_CONNECTIONS << " kết nối tới " << SERVER_IP << "..." << endl;
+    vector<ConnCtx *> contexts;
+    vector<double> latencies;
+    int success_count = 0;
+
+    cout << "🚀 Khởi tạo " << TOTAL_CONNECTIONS << " kết nối tới " << SERVER_IP << "..." << endl;
 
     for (int i = 0; i < TOTAL_CONNECTIONS; ++i)
     {
         int sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (sock < 0)
+            continue;
+
         set_nonblocking(sock);
+
         struct sockaddr_in addr;
         addr.sin_family = AF_INET;
         addr.sin_port = htons(SERVER_PORT);
         inet_pton(AF_INET, SERVER_IP, &addr.sin_addr);
 
+        // Kết nối non-blocking
         connect(sock, (struct sockaddr *)&addr, sizeof(addr));
+
         ConnCtx *ctx = new ConnCtx{sock, steady_clock::now()};
         contexts.push_back(ctx);
 
         struct epoll_event ev;
-        ev.events = EPOLLOUT | EPOLLET;
+        ev.events = EPOLLOUT | EPOLLET; // Chờ sẵn sàng để gửi request
         ev.data.ptr = ctx;
         epoll_ctl(epoll_fd, EPOLL_CTL_ADD, sock, &ev);
     }
 
     auto start_test = steady_clock::now();
     struct epoll_event events[TOTAL_CONNECTIONS];
-    char recv_buf[8192];
+    char recv_buf[4096];
 
-    // Khởi tạo random generator
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_int_distribution<> dist(0, CHAOS_PAYLOADS.size() - 1);
-
+    // Chạy test trong 10 giây
     while (duration_cast<seconds>(steady_clock::now() - start_test).count() < 10)
     {
         int nfds = epoll_wait(epoll_fd, events, TOTAL_CONNECTIONS, 100);
@@ -91,49 +81,53 @@ int main()
         {
             ConnCtx *ctx = (ConnCtx *)events[n].data.ptr;
 
-            if (events[n].events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
-            {
-                error_count++;
-                epoll_ctl(epoll_fd, EPOLL_CTL_DEL, ctx->fd, nullptr);
-                close(ctx->fd);
-                continue;
-            }
-
             if (events[n].events & EPOLLOUT)
             {
-                // Chọn ngẫu nhiên 1 payload để hành hạ Parser
-                string payload = CHAOS_PAYLOADS[dist(gen)];
-                send(ctx->fd, payload.c_str(), payload.length(), 0);
+                // Gửi request
+                send(ctx->fd, PAYLOAD, strlen(PAYLOAD), 0);
+                ctx->start_time = steady_clock::now();
 
+                // Chuyển sang chờ nhận phản hồi
                 struct epoll_event ev;
-                ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
+                ev.events = EPOLLIN | EPOLLET;
                 ev.data.ptr = ctx;
                 epoll_ctl(epoll_fd, EPOLL_CTL_MOD, ctx->fd, &ev);
             }
             else if (events[n].events & EPOLLIN)
             {
+                // Nhận phản hồi
                 int len = recv(ctx->fd, recv_buf, sizeof(recv_buf), 0);
                 if (len > 0)
                 {
+                    auto end_time = steady_clock::now();
+                    double lat = duration_cast<microseconds>(end_time - ctx->start_time).count() / 1000.0;
+                    latencies.push_back(lat);
                     success_count++;
+
+                    // Quay lại gửi tiếp (Keep-alive)
                     struct epoll_event ev;
-                    ev.events = EPOLLOUT | EPOLLET | EPOLLRDHUP;
+                    ev.events = EPOLLOUT | EPOLLET;
                     ev.data.ptr = ctx;
                     epoll_ctl(epoll_fd, EPOLL_CTL_MOD, ctx->fd, &ev);
-                }
-                else if (len == 0)
-                {
-                    error_count++;
                 }
             }
         }
     }
 
-    cout << "\n==============================" << endl;
-    cout << "🌪️ KẾT QUẢ CHAOS TEST 🌪️" << endl;
-    cout << "==============================" << endl;
-    cout << "✅ Requests phản hồi: " << success_count << endl;
-    cout << "💀 Kết nối bị ngắt (Lỗi Parser/Crash): " << error_count << endl;
+    // --- Báo cáo ---
+    double total_time = duration_cast<milliseconds>(steady_clock::now() - start_test).count() / 1000.0;
+    cout << "\n"
+         << string(30, '=') << "\n📊 KẾT QUẢ TEST\n"
+         << string(30, '=') << endl;
+    cout << "✅ Requests thành công: " << success_count << endl;
+    cout << "🚀 RPS (Avg): " << (success_count / total_time) << endl;
+
+    if (!latencies.empty())
+    {
+        sort(latencies.begin(), latencies.end());
+        cout << "📉 Latency Avg: " << (success_count > 0 ? (total_time * 1000 / success_count) : 0) << " ms" << endl;
+        cout << "📈 Latency P95: " << latencies[latencies.size() * 0.95] << " ms" << endl;
+    }
 
     for (auto ctx : contexts)
     {
