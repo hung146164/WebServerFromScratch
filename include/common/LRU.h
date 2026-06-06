@@ -1,49 +1,31 @@
+/*!
+    \file LRU.h
+    \brief LRU cache
+    \author HungForre
+    \date 6/6/2026
+    \copyright VDT
+*/
+
+#ifndef CPPSERVER_COMMON_LRU_H
+#define CPPSERVER_COMMON_LRU_H
+
+#include <unordered_map>
+
 #include "ObjectPool.h"
-#include "CppConfig.h"
-#include "Http/HttpRequest.h"
+#include "Node.h"
 
-struct Node
-{
-    Node *pre{};
-    Node *next{};
-    int key = -1;
-    HttpRequest *value{};
-
-    Node()
-    {
-        value = new HttpRequest();
-    }
-
-    void Reset()
-    {
-        pre = nullptr;
-        next = nullptr;
-        key = -1;
-        if (value != nullptr)
-            value->Reset();
-    }
-};
-
+template <typename T>
 class LRUClient
 {
 private:
-    Node *head = nullptr;
-    Node *tail = nullptr;
-    std::unordered_map<int, Node *> dp;
+    Node<T> *head = nullptr;
+    Node<T> *tail = nullptr;
+    std::unordered_map<int, Node<T> *> dp;
     int cnt = 0;
     int capacity = 0;
-    ObjectPool<Node> pool;
+    ObjectPool<Node<T>> pool;
 
-    LRUClient()
-    {
-        for (int i = 0; i < 1000; i++)
-        {
-            Node *node = new Node();
-            pool.release(node);
-        }
-    }
-
-    void detach(Node *node)
+    void detach(Node<T> *node)
     {
         if (node->pre)
             node->pre->next = node->next;
@@ -56,7 +38,7 @@ private:
             tail = node->pre;
     }
 
-    void attach_head(Node *node)
+    void attach_head(Node<T> *node)
     {
         node->next = head;
         node->pre = nullptr;
@@ -72,22 +54,28 @@ private:
 public:
     LRUClient(int capacity_) : capacity(capacity_)
     {
-        dp.reserve(capacity_);
+        for (int i = 0; i < capacity_; i++)
+        {
+            pool.release(new Node<T>());
+        }
+
+        dp.reserve(static_cast<typename std::unordered_map<int, Node<T> *>::size_type>(capacity_));
     }
 
-    HttpRequest *get(int key)
+    T *get(int key)
     {
         auto it = dp.find(key);
         if (it == dp.end())
             return nullptr;
 
-        Node *curr = it->second;
+        Node<T> *curr = it->second;
         if (curr != head)
         {
             detach(curr);
             attach_head(curr);
         }
-        return curr->value;
+
+        return curr->value.get();
     }
 
     void put(int key)
@@ -95,20 +83,17 @@ public:
         if (cnt >= capacity)
         {
             int old_key = tail->key;
-            Node *old_node = tail;
+            Node<T> *old_node = tail;
 
-            // erase in LRU
             detach(old_node);
             dp.erase(old_key);
 
-            // add to pool
             old_node->Reset();
             pool.release(old_node);
             cnt--;
         }
 
-        // Thêm node mới
-        Node *new_node = pool.acquire();
+        Node<T> *new_node = pool.acquire();
         new_node->key = key;
 
         attach_head(new_node);
@@ -122,7 +107,7 @@ public:
         auto it = dp.find(key);
         if (it != dp.end())
         {
-            Node *node = it->second;
+            Node<T> *node = it->second;
             detach(node);
             dp.erase(it);
             node->Reset();
@@ -130,12 +115,15 @@ public:
             cnt--;
         }
     }
+
     bool full()
     {
         return cnt == capacity;
     }
+
     int oldestKey()
     {
         return tail->key;
     }
 };
+#endif

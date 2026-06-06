@@ -1,6 +1,15 @@
-#pragma once
+/*!
+    \file Node.h
+    \brief Node
+    \author HungForre
+    \date 6/6/2026
+    \copyright VDT
+*/
 
-#include "CppConfig.h"
+#ifndef CPPSERVER_COMMON_OBJECTPOOL_H
+#define CPPSERVER_COMMON_OBJECTPOOL_H
+
+#include <vector>
 
 template <typename T>
 class ObjectPool
@@ -34,3 +43,5 @@ public:
             delete obj;
     }
 };
+
+#endif
