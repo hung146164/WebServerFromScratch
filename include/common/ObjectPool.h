@@ -1,6 +1,6 @@
 /*!
-    \file Node.h
-    \brief Node
+    \file ObjectPool.h
+    \brief ObjectPool
     \author HungForre
     \date 6/6/2026
     \copyright VDT

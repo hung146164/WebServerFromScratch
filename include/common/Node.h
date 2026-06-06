@@ -11,7 +11,6 @@
 
 #include <memory>
 
-// Node có thể nhận nhiều kiểu value, yêu cầu value phải có hàm reset
 template <typename T>
 struct Node
 {
