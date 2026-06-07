@@ -23,6 +23,9 @@ struct HttpRequest
     std::string_view http_url;
     std::string_view http_protocol;
     std::unordered_map<std::string_view, std::string_view> header;
+
+    size_t content_len = 0;
+    std::string_view content_type;
     std::string_view body;
 
     int head_idx = 0;
@@ -34,11 +37,6 @@ struct HttpRequest
 
     // Ring buffer
     std::vector<char> cache;
-
-    // Content Length
-    size_t content_len = 0;
-
-    std::string_view content_type;
 
     HttpRequest(size_t bufferSize = 65536)
     {

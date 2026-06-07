@@ -24,11 +24,6 @@ struct Node
         value = std::make_unique<T>();
     }
 
-    ~Node()
-    {
-        delete value;
-    }
-
     void Reset()
     {
         pre = nullptr;

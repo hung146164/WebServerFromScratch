@@ -1,8 +1,25 @@
-#pragma once
+/*!
+    \file ServerConfig.h
+    \brief ServerConfig
+    \author HungForre
+    \date 7/6/2026
+    \copyright VDT
+*/
 
-const int PORT = 8080;
-const int MAX_EVENTS = 1024;
-const int MAX_LISTEN = 1024;
-const short NUMBER_OF_WORKER = 2;
-const char MAX_CLIENT_PER_IP = 2;
-const short CLIENT_PER_THREAD = 5000;
+#ifndef CPPSERVER_NETWORK_SERVERCONFIG_H
+#define CPPSERVER_NETWORK_SERVERCONFIG_H
+
+#include <thread>
+
+struct ServerConfig
+{
+    int port = 8080;
+    int num_workers = static_cast<int>(std::thread::hardware_concurrency());
+    int client_per_worker = 5000;
+    int max_epoll_events = 1024;
+    int max_listen_queue = 1024;
+    int max_client_per_ip = 10;
+    int read_timeout_sec = 15;
+};
+
+#endif

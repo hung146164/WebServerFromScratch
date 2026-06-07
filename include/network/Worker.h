@@ -11,19 +11,21 @@
 
 #include <vector>
 #include <atomic>
-#include <sys/epoll.h>
+#include <string>
 #include <string_view>
+#include <sys/epoll.h>
 
 #include "common/LRU.h"
-#include "server/http/HttpRequest.h"
 #include "common/SocketGuard.h"
+#include "server/http/HttpRequest.h"
+#include "server/http/Router.h"
+#include "network/ServerConfig.h"
 
 class Worker
 {
 private:
     int worker_id;
-    int max_epoll_event;
-    int max_client;
+    ServerConfig config;
 
     SocketGuard epollSocket;
     std::vector<epoll_event> client_events;
@@ -32,20 +34,16 @@ private:
 
     std::atomic<int> current_conn{0};
 
-private:
-    void StartWorker();
-
+    void SetupWorker();
     void HandleRequest(int fd);
-
     void CloseConnection(int fd);
-
     void ProcessHttpRequest(int fd, HttpRequest *request);
-
-    void SendStatusResponse(int fd, int errcode, std::string_view mgs);
+    void SendStatusResponse(int fd, int status_code, std::string_view msg);
 
 public:
-    Worker(int worker_id_, int max_epoll_event_, int max_client_);
+    Worker(int worker_id_, ServerConfig config_);
 
+    void StartWorker();
     void AddClient(int client_fd);
     int getConnCount();
 };

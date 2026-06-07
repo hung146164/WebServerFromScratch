@@ -309,7 +309,7 @@ const HttpParserState *StartBodyState::Instance()
 }
 const HttpParserState *StartBodyState::HandleChar(char c, HttpRequest &req) const
 {
-    // Tính độ dài body đã đọc được (bao gồm cả ký tự c hiện tại)
+
     int body_len = req.curr_idx - req.start_idx + 1;
 
     if (body_len >= (int)req.content_len)

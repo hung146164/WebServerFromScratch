@@ -8,33 +8,52 @@
 
 #include "network/Worker.h"
 #include "server/http/HttpParserState.h"
+
 #include <iostream>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <errno.h>
-#include <fcntl.h>
+#include <sstream>
 #include <string>
 #include <cstring>
+#include <cerrno>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/socket.h>
 
-inline void set_nonblocking(int fd)
+// ─── Helper: Đặt socket sang chế độ Non-Blocking ───────────────────────────
+static void set_nonblocking(int fd)
 {
     int flags = fcntl(fd, F_GETFL, 0);
-    if (flags != -1)
+    if (flags == -1)
     {
-        fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+        std::cerr << "[Worker] fcntl F_GETFL failed\n";
+        return;
+    }
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+    {
+        std::cerr << "[Worker] fcntl F_SETFL O_NONBLOCK failed\n";
     }
 }
 
-Worker::Worker(int worker_id_, int max_epoll_event_, int max_client_)
+// ─── Constructor ─────────────────────────────────────────────────────────────
+Worker::Worker(int worker_id_, ServerConfig config_)
     : worker_id(worker_id_),
-      max_epoll_event(max_epoll_event_),
-      max_client(max_client_),
-      lru(max_client_)
+      config(config_),
+      lru(config_.client_per_worker)
 {
-    epollSocket.SetSocketfd(epoll_create1(0));
-    client_events.resize(static_cast<size_t>(max_epoll_event_));
+    SetupWorker();
 }
 
+void Worker::SetupWorker()
+{
+    epollSocket.SetSocketfd(epoll_create1(0));
+    if (epollSocket.GetSocketfd() == -1)
+    {
+        std::cerr << "[Worker " << worker_id << "] epoll_create1 failed\n";
+        return;
+    }
+    client_events.resize(static_cast<size_t>(config.max_epoll_events));
+}
+
+// ─── Event Loop chính ────────────────────────────────────────────────────────
 void Worker::StartWorker()
 {
     if (epollSocket.GetSocketfd() == -1)
@@ -42,7 +61,18 @@ void Worker::StartWorker()
 
     while (true)
     {
-        int cnt = epoll_wait(epollSocket.GetSocketfd(), client_events.data(), max_epoll_event, -1);
+        int cnt = epoll_wait(epollSocket.GetSocketfd(),
+                             client_events.data(),
+                             config.max_epoll_events, // Dùng config thay vì biến cũ
+                             -1);
+        if (cnt < 0)
+        {
+            if (errno == EINTR)
+                continue; // Bị ngắt bởi signal, tiếp tục
+            std::cerr << "[Worker " << worker_id << "] epoll_wait error\n";
+            break;
+        }
+
         for (int i = 0; i < cnt; i++)
         {
             int fd = client_events[i].data.fd;
@@ -54,7 +84,7 @@ void Worker::StartWorker()
                 CloseConnection(fd);
                 current_conn--;
             }
-            else
+            else if (client_events[i].events & EPOLLIN)
             {
                 HandleRequest(fd);
             }
@@ -62,22 +92,19 @@ void Worker::StartWorker()
     }
 }
 
+// ─── Quản lý kết nối ─────────────────────────────────────────────────────────
 void Worker::CloseConnection(int fd)
 {
+    epoll_ctl(epollSocket.GetSocketfd(), EPOLL_CTL_DEL, fd, nullptr);
     close(fd);
     lru.remove(fd);
 }
 
-void Worker::ProcessHttpRequest(int fd, HttpRequest *request)
-{
-    Application::Router::Dispatch(fd, *request);
-}
-
-// Hiện đang kích ông cuối, cần FIX lại
 void Worker::AddClient(int client_fd)
 {
     if (lru.full())
     {
+        // LRU đầy: kick client cũ nhất ra để nhường chỗ
         int old_fd = lru.oldestKey();
         if (old_fd != -1)
         {
@@ -90,19 +117,38 @@ void Worker::AddClient(int client_fd)
 
     set_nonblocking(client_fd);
 
-    epoll_event ev;
+    epoll_event ev{};
     ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
     ev.data.fd = client_fd;
 
     if (epoll_ctl(epollSocket.GetSocketfd(), EPOLL_CTL_ADD, client_fd, &ev) < 0)
     {
-        perror("epoll_ctl ADD client");
+        std::cerr << "[Worker " << worker_id << "] epoll_ctl ADD failed\n";
         close(client_fd);
         return;
     }
 
     lru.put(client_fd);
     current_conn++;
+}
+
+// ─── Xử lý Request ───────────────────────────────────────────────────────────
+void Worker::ProcessHttpRequest(int fd, HttpRequest *request)
+{
+    Http::Router::Dispatch(fd, *request);
+}
+
+void Worker::SendStatusResponse(int fd, int status_code, std::string_view msg)
+{
+    std::ostringstream oss;
+    oss << "HTTP/1.1 " << status_code << " " << msg << "\r\n"
+        << "Content-Type: text/plain\r\n"
+        << "Content-Length: " << msg.size() << "\r\n"
+        << "Connection: close\r\n\r\n"
+        << msg;
+
+    std::string response = oss.str();
+    send(fd, response.data(), response.size(), MSG_NOSIGNAL);
 }
 
 void Worker::HandleRequest(int fd)
@@ -117,10 +163,8 @@ void Worker::HandleRequest(int fd)
     {
         int space = capacity - request->tail_idx;
 
-        // Kiểm tra buffer đầy TRƯỚC khi gọi recv
         if (space <= 0)
         {
-            // Buffer đầy nhưng chưa parse xong 1 request -> Request quá lớn
             SendStatusResponse(fd, 413, "Payload Too Large");
             CloseConnection(fd);
             return;
@@ -132,30 +176,20 @@ void Worker::HandleRequest(int fd)
         if (bytes_read < 0)
         {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
-            {
-                // Đã đọc cạn dữ liệu trong socket OS, thoát để đợi sự kiện epoll tiếp theo
                 break;
-            }
             if (errno == EINTR)
-            {
-                // Bị ngắt bởi tín hiệu (signal), đọc lại ngay lập tức
                 continue;
-            }
-            // Lỗi socket khác -> Đóng kết nối
             CloseConnection(fd);
             return;
         }
         else if (bytes_read == 0)
         {
-            // Client ngắt kết nối (EOF)
             CloseConnection(fd);
             return;
         }
 
-        // 3. Nếu đọc thành công dữ liệu, cộng vào tail_idx
         request->tail_idx += static_cast<int>(bytes_read);
 
-        // 4. Vòng lặp parse và xử lý request (hỗ trợ HTTP Pipelining)
         bool connection_closed = false;
         while (true)
         {
@@ -163,40 +197,33 @@ void Worker::HandleRequest(int fd)
 
             if (state == CompleteState::Instance())
             {
-                // A. Xử lý request đồng bộ và gửi phản hồi
                 ProcessHttpRequest(fd, request);
 
-                // B. Dịch chuyển phần thừa còn lại về đầu mảng
                 int remain = request->tail_idx - request->curr_idx;
                 if (remain > 0)
                 {
-                    std::memmove(&request->cache[0], &request->cache[request->curr_idx], remain);
+                    std::memmove(&request->cache[0],
+                                 &request->cache[request->curr_idx],
+                                 static_cast<size_t>(remain));
                 }
-
                 request->NextRequest(remain);
-
                 continue;
             }
             else if (state == ErrorState::Instance())
             {
-                // Parse lỗi -> gửi 400 Bad Request và đóng kết nối
-                std::string error_mgs = "Bad Request";
-                SendStatusResponse(fd, 400, error_mgs);
+                SendStatusResponse(fd, 400, "Bad Request");
                 CloseConnection(fd);
                 connection_closed = true;
                 break;
             }
             else
             {
-
                 break;
             }
         }
 
         if (connection_closed)
-        {
             return;
-        }
     }
 }
 
