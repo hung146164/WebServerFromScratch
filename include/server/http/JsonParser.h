@@ -67,7 +67,7 @@ namespace Http
         static std::string_view GetString(JsonNode *node, std::string_view key);
 
         /// Lấy giá trị số nguyên
-        /// int age = JsonParser::GetInt(root, "age"); // 20
+        /// int age = JsonParser::Getint(root, "age"); // 20
         static int GetInt(JsonNode *node, std::string_view key);
 
         /// Lấy giá trị số thực
@@ -79,18 +79,18 @@ namespace Http
         static bool GetBool(JsonNode *node, std::string_view key);
 
         /// Kiểm tra node có tồn tại và đúng kiểu không
-        /// Dùng trước khi GetString/GetInt để tránh crash nếu JSON thiếu field
+        /// Dùng trước khi GetString/Getint để tránh crash nếu JSON thiếu field
         static bool Has(JsonNode *node, std::string_view key);
 
     private:
         // ─── Hàm parse nội bộ (người dùng không gọi trực tiếp) ──────────────
 
-        static void SkipWhitespace(std::string_view json, size_t &idx);
-        static JsonNode *ParseValue(std::string_view json, size_t &idx);
-        static JsonNode *ParseObject(std::string_view json, size_t &idx);
-        static JsonNode *ParseArray(std::string_view json, size_t &idx);
-        static JsonNode *ParseString(std::string_view json, size_t &idx);
-        static JsonNode *ParsePrimitive(std::string_view json, size_t &idx);
+        static void SkipWhitespace(std::string_view json, int &idx);
+        static JsonNode *ParseValue(std::string_view json, int &idx);
+        static JsonNode *ParseObject(std::string_view json, int &idx);
+        static JsonNode *ParseArray(std::string_view json, int &idx);
+        static JsonNode *ParseString(std::string_view json, int &idx);
+        static JsonNode *ParsePrimitive(std::string_view json, int &idx);
     };
 
     // ─── Bộ SERIALIZE JSON (Cây DSLK -> Chuỗi) ──────────────────────────────

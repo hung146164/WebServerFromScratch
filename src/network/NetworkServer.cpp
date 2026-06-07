@@ -5,7 +5,6 @@
     \date 7/6/2026
     \copyright VDT
 */
-
 #include "network/NetworkServer.h"
 
 #include <iostream>
@@ -24,38 +23,28 @@ NetworkServer::NetworkServer(ServerConfig config_)
         return;
     }
 
-    newClients.resize(static_cast<size_t>(config_.max_epoll_events));
+    newClients.resize((size_t)config_.max_epoll_events);
 
     SetupNetwork();
-    SetupThread();
 }
 
 void NetworkServer::SetupThread()
 {
     for (int i = 0; i < config.num_workers; ++i)
-    {
-        Worker *w = new Worker(i, config);
-        worker_instances.push_back(w);
-    }
+        worker_instances.push_back(new Worker(i, config));
 
     for (int i = 0; i < config.num_workers; ++i)
-    {
         threads.emplace_back(&Worker::StartWorker, worker_instances[i]);
-    }
 }
 
 NetworkServer::~NetworkServer()
 {
-    for (auto &thread : threads)
-    {
-        if (thread.joinable())
-            thread.join();
-    }
+    for (auto &t : threads)
+        if (t.joinable())
+            t.join();
 
     for (auto w : worker_instances)
-    {
         delete w;
-    }
 }
 
 void NetworkServer::SetupNetwork()
@@ -75,10 +64,10 @@ void NetworkServer::SetupNetwork()
 
     sockaddr_in server_addr{};
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(static_cast<uint16_t>(config.port));
+    server_addr.sin_port = htons((uint16_t)config.port);
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
-    if (bind(serverSocket.GetSocketfd(), reinterpret_cast<sockaddr *>(&server_addr), sizeof(server_addr)) < 0)
+    if (bind(serverSocket.GetSocketfd(), (sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
         std::cerr << "[Server] Bind failed!\n";
         return;
@@ -102,9 +91,7 @@ void NetworkServer::SetupNetwork()
     ev.events = EPOLLIN | EPOLLET;
 
     if (epoll_ctl(epollSocket.GetSocketfd(), EPOLL_CTL_ADD, serverSocket.GetSocketfd(), &ev) < 0)
-    {
         std::cerr << "[Server] Epoll setup error!\n";
-    }
 }
 
 void NetworkServer::AcceptClient()
@@ -115,18 +102,17 @@ void NetworkServer::AcceptClient()
     while (true)
     {
         int client_fd = accept(serverSocket.GetSocketfd(),
-                               reinterpret_cast<sockaddr *>(&clientAddr),
+                               (sockaddr *)&clientAddr,
                                &clientAddrLen);
         if (client_fd < 0)
         {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
-                break; // Đã accept hết client đang chờ
+                break;
             if (errno == EMFILE || errno == ENFILE)
-                std::cerr << "[Server] Warning: System FD limit reached!\n";
+                std::cerr << "[Server] Warning: FD limit reached!\n";
             break;
         }
 
-        // Phân bổ Round-Robin sang các Worker
         worker_instances[next_worker]->AddClient(client_fd);
         next_worker = (next_worker + 1) % config.num_workers;
     }
@@ -134,6 +120,7 @@ void NetworkServer::AcceptClient()
 
 void NetworkServer::Start()
 {
+    SetupThread();
     std::cout << "[Server] Listening on port " << config.port
               << " with " << config.num_workers << " worker threads.\n";
 
@@ -143,17 +130,15 @@ void NetworkServer::Start()
                              newClients.data(),
                              config.max_epoll_events,
                              -1);
-        for (int i = 0; i < cnt; i++)
+        for (int i = 0; i < cnt; ++i)
         {
             if (newClients[i].data.fd == serverSocket.GetSocketfd())
-            {
                 AcceptClient();
-            }
         }
     }
 }
 
 void NetworkServer::Stop()
 {
-    // TODO: set running flag = false, wakeup epoll_wait bằng eventfd
+    // TODO: eventfd wakeup
 }

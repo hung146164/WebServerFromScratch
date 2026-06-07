@@ -1,11 +1,10 @@
 /*!
     \file SocketGuard.h
-    \brief SocketGuard RAII wrapper
+    \brief SocketGuard — RAII wrapper cho socket file descriptor
     \author HungForre
     \date 6/6/2026
     \copyright VDT
 */
-
 #ifndef CPPSERVER_COMMON_SOCKETGUARD_H
 #define CPPSERVER_COMMON_SOCKETGUARD_H
 
@@ -19,13 +18,9 @@ private:
 
 public:
     SocketGuard() = default;
-
     explicit SocketGuard(int fd_) : fd(fd_) {}
 
-    ~SocketGuard()
-    {
-        Close();
-    }
+    ~SocketGuard() { Close(); }
 
     SocketGuard(const SocketGuard &) = delete;
     SocketGuard &operator=(const SocketGuard &) = delete;
@@ -52,10 +47,7 @@ public:
         fd = fd_;
     }
 
-    int GetSocketfd() const
-    {
-        return fd;
-    }
+    int GetSocketfd() const { return fd; }
 
     void Close()
     {
@@ -68,9 +60,9 @@ public:
 
     int Release()
     {
-        int temp = fd;
+        int tmp = fd;
         fd = -1;
-        return temp;
+        return tmp;
     }
 };
 

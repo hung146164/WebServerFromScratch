@@ -27,7 +27,11 @@ private:
     std::vector<Worker *> worker_instances;
     std::vector<epoll_event> newClients;
     std::vector<std::thread> threads;
+    std::atomic<bool> is_running{false};
+
     int next_worker{0};
+
+    int wakeup_fd{-1};
 
     void SetupNetwork();
     void SetupThread();

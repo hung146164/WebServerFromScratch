@@ -15,47 +15,131 @@
 
 namespace Http
 {
-    // ─── Nội bộ, người dùng không gọi trực tiếp ──────────────────────────────
 
-    /// Chuyển mã status HTTP thành chuỗi mô tả
-    /// Cần thiết vì send() phải gửi chuỗi "200 OK", "404 Not Found"...
-    /// chứ không phải con số thuần túy
-    inline std::string StatusMessage(int code);
+    // ─── Nội bộ ──────────────────────────────────────────────────────────────────
 
-    /// Hàm gửi response lõi, tất cả hàm bên dưới đều gọi vào đây
-    /// Tự động ghép HTTP headers + body thành đúng định dạng HTTP/1.1
-    /// Tự động thêm CORS header để Frontend không bị trình duyệt chặn
+    inline std::string StatusMessage(int code)
+    {
+        switch (code)
+        {
+        case 200:
+            return "OK";
+        case 201:
+            return "Created";
+        case 204:
+            return "No Content";
+        case 301:
+            return "Moved Permanently";
+        case 302:
+            return "Found";
+        case 304:
+            return "Not Modified";
+        case 400:
+            return "Bad Request";
+        case 401:
+            return "Unauthorized";
+        case 403:
+            return "Forbidden";
+        case 404:
+            return "Not Found";
+        case 405:
+            return "Method Not Allowed";
+        case 409:
+            return "Conflict";
+        case 413:
+            return "Payload Too Large";
+        case 415:
+            return "Unsupported Media Type";
+        case 429:
+            return "Too Many Requests";
+        case 500:
+            return "internal Server Error";
+        default:
+            return "Unknown";
+        }
+    }
+
     inline void SendRaw(int fd, int status,
                         std::string_view content_type,
-                        std::string_view body);
+                        std::string_view body)
+    {
+        std::ostringstream oss;
+        oss << "HTTP/1.1 " << status << " " << StatusMessage(status) << "\r\n"
+            << "Content-Type: " << content_type << "\r\n"
+            << "Content-Length: " << body.size() << "\r\n"
+            << "Access-Control-Allow-Origin: *\r\n"
+            << "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n"
+            << "Access-Control-Allow-Headers: Content-Type, Authorization\r\n"
+            << "Connection: keep-alive\r\n\r\n";
 
-    // ─── API công khai cho người dùng Framework ───────────────────────────────
+        std::string header = oss.str();
 
-    /// Gửi JSON response
-    /// Dùng khi: Hầu hết mọi API endpoint trả dữ liệu về cho Frontend
-    /// Ví dụ: Http::JSON(fd, 200, "{\"name\":\"Nam\"}");
-    inline void JSON(int fd, int status, std::string_view body);
+        // Gửi header
+        send(fd, header.data(), header.size(), MSG_NOSIGNAL);
+        // Gửi body (nếu có)
+        if (!body.empty())
+            send(fd, body.data(), body.size(), MSG_NOSIGNAL);
+    }
 
-    /// Gửi HTML response
-    /// Dùng khi: Render trang web trực tiếp từ Server (Server-Side Rendering)
-    /// Ví dụ: Http::HTML(fd, 200, "<h1>Xin chào</h1>");
-    inline void HTML(int fd, int status, std::string_view body);
+    // ─── API công khai ────────────────────────────────────────────────────────────
 
-    /// Gửi plain text response
-    /// Dùng khi: Debug, health check endpoint, webhook đơn giản
-    /// Ví dụ: Http::Text(fd, 200, "pong");
-    inline void Text(int fd, int status, std::string_view body);
+    /// Http::JSON(fd, 200, "{\"name\":\"Nam\"}");
+    inline void JSON(int fd, int status, std::string_view body)
+    {
+        SendRaw(fd, status, "application/json; charset=utf-8", body);
+    }
 
-    /// Chuyển hướng client sang URL khác (302 redirect)
-    /// Dùng khi: Người dùng chưa đăng nhập -> chuyển sang /login
-    ///           Sau khi submit form -> chuyển sang trang kết quả
-    /// Ví dụ: Http::Redirect(fd, "/login");
-    inline void Redirect(int fd, std::string_view location);
+    /// Http::HTML(fd, 200, "<h1>Hello</h1>");
+    inline void HTML(int fd, int status, std::string_view body)
+    {
+        SendRaw(fd, status, "text/html; charset=utf-8", body);
+    }
 
-    /// Gửi response lỗi dạng JSON chuẩn hóa
-    /// Dùng khi: Bất kỳ lỗi nào trong handler (validate thất bại, không tìm thấy,...)
-    /// Ví dụ: Http::Error(fd, 403, "You don't have permission");
-    inline void Error(int fd, int status, std::string_view message);
+    /// Http::Text(fd, 200, "pong");
+    inline void Text(int fd, int status, std::string_view body)
+    {
+        SendRaw(fd, status, "text/plain; charset=utf-8", body);
+    }
+
+    /// Http::Redirect(fd, "/login");
+    inline void Redirect(int fd, std::string_view location)
+    {
+        std::ostringstream oss;
+        oss << "HTTP/1.1 302 Found\r\n"
+            << "Location: " << location << "\r\n"
+            << "Content-Length: 0\r\n"
+            << "Connection: keep-alive\r\n\r\n";
+        std::string res = oss.str();
+        send(fd, res.data(), res.size(), MSG_NOSIGNAL);
+    }
+
+    /// Http::Error(fd, 404, "Not Found");
+    inline void Error(int fd, int status, std::string_view message)
+    {
+        std::ostringstream oss;
+        oss << "{\"error\":\"" << message << "\",\"status\":" << status << "}";
+        JSON(fd, status, oss.str());
+    }
+
+    /// Http::NoContent(fd);  — dùng sau DELETE thành công
+    inline void NoContent(int fd)
+    {
+        std::string res = "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: keep-alive\r\n\r\n";
+        send(fd, res.data(), res.size(), MSG_NOSIGNAL);
+    }
+
+    /// Xử lý OPTIONS preflight của CORS (trình duyệt gửi trước POST/PUT)
+    inline void HandleCORSPreflight(int fd)
+    {
+        std::string res =
+            "HTTP/1.1 200 OK\r\n"
+            "Access-Control-Allow-Origin: *\r\n"
+            "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n"
+            "Access-Control-Allow-Headers: Content-Type, Authorization\r\n"
+            "Access-Control-Max-Age: 86400\r\n"
+            "Content-Length: 0\r\n\r\n";
+        send(fd, res.data(), res.size(), MSG_NOSIGNAL);
+    }
 
 } // namespace Http
 

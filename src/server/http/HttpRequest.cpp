@@ -1,11 +1,10 @@
 /*!
     \file HttpRequest.cpp
-    \brief Implementation of HttpRequest and State pattern classes
+    \brief FSM HTTP parser
     \author HungForre
     \date 6/6/2026
     \copyright VDT
 */
-
 #include "server/http/HttpRequest.h"
 #include "server/http/HttpParserState.h"
 #include <cctype>
@@ -19,9 +18,7 @@ const HttpParserState *HttpRequest::Parse()
            state != ErrorState::Instance())
     {
         char c = cache[curr_idx];
-
         state = state->HandleChar(c, *this);
-
         curr_idx++;
     }
     return state;
@@ -31,10 +28,10 @@ void HttpRequest::Reset()
 {
     state = StartState::Instance();
     method = HttpMethod::UNKNOWN;
-    http_url = std::string_view();
-    http_protocol = std::string_view();
+    http_url = {};
+    http_protocol = {};
     header.clear();
-    body = std::string_view();
+    body = {};
     content_len = 0;
     tail_idx = 0;
     start_idx = 0;
@@ -45,31 +42,29 @@ void HttpRequest::NextRequest(int new_tail)
 {
     state = StartState::Instance();
     method = HttpMethod::UNKNOWN;
-    http_url = std::string_view();
-    http_protocol = std::string_view();
+    http_url = {};
+    http_protocol = {};
     header.clear();
-    body = std::string_view();
+    body = {};
     content_len = 0;
-
     curr_idx = 0;
     start_idx = 0;
-
-    // Gán tail_idx bằng số byte dư thừa sau khi dịch chuyển
     tail_idx = new_tail;
 }
+
+static inline int span(int from, int to) { return (int)(to - from); }
 
 // --- StartState ---
 const HttpParserState *StartState::Instance()
 {
-    static StartState instance;
-    return &instance;
+    static StartState i;
+    return &i;
 }
+
 const HttpParserState *StartState::HandleChar(char c, HttpRequest &req) const
 {
     if (c == ' ' || c == '\r' || c == '\n')
-    {
         return this;
-    }
     req.start_idx = req.curr_idx;
     return MethodState::Instance();
 }
@@ -77,16 +72,15 @@ const HttpParserState *StartState::HandleChar(char c, HttpRequest &req) const
 // --- MethodState ---
 const HttpParserState *MethodState::Instance()
 {
-    static MethodState instance;
-    return &instance;
+    static MethodState i;
+    return &i;
 }
+
 const HttpParserState *MethodState::HandleChar(char c, HttpRequest &req) const
 {
     if (c == ' ')
     {
-        int len = req.curr_idx - req.start_idx;
-        std::string_view m(&req.cache[req.start_idx], len);
-
+        std::string_view m(&req.cache[req.start_idx], span(req.start_idx, req.curr_idx));
         if (m == "GET")
             req.method = HttpMethod::GET;
         else if (m == "POST")
@@ -101,58 +95,51 @@ const HttpParserState *MethodState::HandleChar(char c, HttpRequest &req) const
             req.method = HttpMethod::OPTIONS;
         else
             req.method = HttpMethod::UNKNOWN;
-
         req.start_idx = req.curr_idx + 1;
         return UrlState::Instance();
     }
-    else if (c == '\r' || c == '\n')
-    {
+    if (c == '\r' || c == '\n')
         return ErrorState::Instance();
-    }
     return this;
 }
 
 // --- UrlState ---
 const HttpParserState *UrlState::Instance()
 {
-    static UrlState instance;
-    return &instance;
+    static UrlState i;
+    return &i;
 }
+
 const HttpParserState *UrlState::HandleChar(char c, HttpRequest &req) const
 {
     if (c == ' ')
     {
-        int len = req.curr_idx - req.start_idx;
-        req.http_url = std::string_view(&req.cache[req.start_idx], len);
+        req.http_url = std::string_view(&req.cache[req.start_idx], span(req.start_idx, req.curr_idx));
         req.start_idx = req.curr_idx + 1;
-
         return ProtocolState::Instance();
     }
-    else if (c == '\r' || c == '\n')
-    {
+    if (c == '\r' || c == '\n')
         return ErrorState::Instance();
-    }
     return this;
 }
 
 // --- ProtocolState ---
 const HttpParserState *ProtocolState::Instance()
 {
-    static ProtocolState instance;
-    return &instance;
+    static ProtocolState i;
+    return &i;
 }
+
 const HttpParserState *ProtocolState::HandleChar(char c, HttpRequest &req) const
 {
     if (c == '\r')
     {
-        int len = req.curr_idx - req.start_idx;
-        req.http_protocol = std::string_view(&req.cache[req.start_idx], len);
+        req.http_protocol = std::string_view(&req.cache[req.start_idx], span(req.start_idx, req.curr_idx));
         return ProtocolCRState::Instance();
     }
-    else if (c == '\n')
+    if (c == '\n')
     {
-        int len = req.curr_idx - req.start_idx;
-        req.http_protocol = std::string_view(&req.cache[req.start_idx], len);
+        req.http_protocol = std::string_view(&req.cache[req.start_idx], span(req.start_idx, req.curr_idx));
         req.start_idx = req.curr_idx + 1;
         return StartHeaderState::Instance();
     }
@@ -162,9 +149,10 @@ const HttpParserState *ProtocolState::HandleChar(char c, HttpRequest &req) const
 // --- ProtocolCRState ---
 const HttpParserState *ProtocolCRState::Instance()
 {
-    static ProtocolCRState instance;
-    return &instance;
+    static ProtocolCRState i;
+    return &i;
 }
+
 const HttpParserState *ProtocolCRState::HandleChar(char c, HttpRequest &req) const
 {
     if (c == '\n')
@@ -178,107 +166,103 @@ const HttpParserState *ProtocolCRState::HandleChar(char c, HttpRequest &req) con
 // --- StartHeaderState ---
 const HttpParserState *StartHeaderState::Instance()
 {
-    static StartHeaderState instance;
-    return &instance;
+    static StartHeaderState i;
+    return &i;
 }
+
 const HttpParserState *StartHeaderState::HandleChar(char c, HttpRequest &req) const
 {
     if (c == '\r')
-    {
         return StartHeaderCRState::Instance();
-    }
-    else
-    {
-        return HeaderKeyState::Instance();
-    }
+    return HeaderKeyState::Instance();
 }
 
 // --- StartHeaderCRState ---
 const HttpParserState *StartHeaderCRState::Instance()
 {
-    static StartHeaderCRState instance;
-    return &instance;
+    static StartHeaderCRState i;
+    return &i;
 }
+
 const HttpParserState *StartHeaderCRState::HandleChar(char c, HttpRequest &req) const
 {
-    if (c == '\n')
+    if (c != '\n')
+        return ErrorState::Instance();
+
+    for (const auto &pair : req.header)
     {
-        for (const auto &pair : req.header)
+        std::string key(pair.first);
+        std::transform(key.begin(), key.end(), key.begin(), [](unsigned char ch)
+                       { return std::tolower(ch); });
+
+        if (key == "content-length")
         {
-            std::string key(pair.first);
-
-            std::transform(key.begin(), key.end(), key.begin(), ::tolower);
-
-            if (key == "content-length")
+            try
             {
-                try
-                {
-                    req.content_len = std::stoul(std::string(pair.second));
-                }
-                catch (...)
-                {
-                    return ErrorState::Instance();
-                }
+                req.content_len = std::stoul(std::string(pair.second));
             }
-            else if (key == "content-type")
+            catch (...)
             {
-                req.content_type = pair.second;
+                return ErrorState::Instance();
             }
         }
-
-        if (req.content_len > 0)
+        else if (key == "content-type")
         {
-            req.start_idx = req.curr_idx + 1;
-            return StartBodyState::Instance();
-        }
-        else
-        {
-            return CompleteState::Instance();
+            req.content_type = pair.second;
         }
     }
-    return ErrorState::Instance();
+
+    if (req.content_len > 0)
+    {
+        req.start_idx = req.curr_idx + 1;
+        return StartBodyState::Instance();
+    }
+    return CompleteState::Instance();
 }
 
 // --- HeaderKeyState ---
 const HttpParserState *HeaderKeyState::Instance()
 {
-    static HeaderKeyState instance;
-    return &instance;
+    static HeaderKeyState i;
+    return &i;
 }
+
 const HttpParserState *HeaderKeyState::HandleChar(char c, HttpRequest &req) const
 {
     if (c == ':')
     {
-        int len = req.curr_idx - req.start_idx;
-        req.current_header_key = std::string_view(&req.cache[req.start_idx], len);
+        req.current_header_key = std::string_view(&req.cache[req.start_idx], span(req.start_idx, req.curr_idx));
         req.start_idx = req.curr_idx + 1;
         return HeaderValueState::Instance();
     }
-    else if (c == '\r' || c == '\n')
-    {
+    if (c == '\r' || c == '\n')
         return ErrorState::Instance();
-    }
     return this;
 }
 
 // --- HeaderValueState ---
 const HttpParserState *HeaderValueState::Instance()
 {
-    static HeaderValueState instance;
-    return &instance;
+    static HeaderValueState i;
+    return &i;
 }
+
 const HttpParserState *HeaderValueState::HandleChar(char c, HttpRequest &req) const
 {
+    if (req.curr_idx == req.start_idx && c == ' ')
+    {
+        req.start_idx++;
+        return this;
+    }
+
     if (c == '\r')
     {
-        int len = req.curr_idx - req.start_idx;
-        req.header[req.current_header_key] = std::string_view(&req.cache[req.start_idx], len);
+        req.header[req.current_header_key] = std::string_view(&req.cache[req.start_idx], span(req.start_idx, req.curr_idx));
         return HeaderValueCRState::Instance();
     }
-    else if (c == '\n')
+    if (c == '\n')
     {
-        int len = req.curr_idx - req.start_idx;
-        req.header[req.current_header_key] = std::string_view(&req.cache[req.start_idx], len);
+        req.header[req.current_header_key] = std::string_view(&req.cache[req.start_idx], span(req.start_idx, req.curr_idx));
         req.start_idx = req.curr_idx + 1;
         return StartHeaderState::Instance();
     }
@@ -288,9 +272,10 @@ const HttpParserState *HeaderValueState::HandleChar(char c, HttpRequest &req) co
 // --- HeaderValueCRState ---
 const HttpParserState *HeaderValueCRState::Instance()
 {
-    static HeaderValueCRState instance;
-    return &instance;
+    static HeaderValueCRState i;
+    return &i;
 }
+
 const HttpParserState *HeaderValueCRState::HandleChar(char c, HttpRequest &req) const
 {
     if (c == '\n')
@@ -304,15 +289,16 @@ const HttpParserState *HeaderValueCRState::HandleChar(char c, HttpRequest &req) 
 // --- StartBodyState ---
 const HttpParserState *StartBodyState::Instance()
 {
-    static StartBodyState instance;
-    return &instance;
+    static StartBodyState i;
+    return &i;
 }
+
 const HttpParserState *StartBodyState::HandleChar(char c, HttpRequest &req) const
 {
-
+    (void)c;
     int body_len = req.curr_idx - req.start_idx + 1;
 
-    if (body_len >= (int)req.content_len)
+    if (body_len >= req.content_len)
     {
         req.body = std::string_view(&req.cache[req.start_idx], req.content_len);
         return CompleteState::Instance();
@@ -321,25 +307,17 @@ const HttpParserState *StartBodyState::HandleChar(char c, HttpRequest &req) cons
 }
 
 // --- CompleteState ---
-
 const HttpParserState *CompleteState::Instance()
 {
-    static CompleteState instance;
-    return &instance;
+    static CompleteState i;
+    return &i;
 }
-
-const HttpParserState *CompleteState::HandleChar(char c, HttpRequest &req) const
-{
-    return this;
-}
+const HttpParserState *CompleteState::HandleChar(char, HttpRequest &) const { return this; }
 
 // --- ErrorState ---
 const HttpParserState *ErrorState::Instance()
 {
-    static ErrorState instance;
-    return &instance;
+    static ErrorState i;
+    return &i;
 }
-const HttpParserState *ErrorState::HandleChar(char c, HttpRequest &req) const
-{
-    return this;
-}
+const HttpParserState *ErrorState::HandleChar(char, HttpRequest &) const { return this; }

@@ -1,11 +1,10 @@
 /*!
     \file Node.h
-    \brief Node
+    \brief Node doubly-linked list cho LRU
     \author HungForre
     \date 6/6/2026
     \copyright VDT
 */
-
 #ifndef CPPSERVER_COMMON_NODE_H
 #define CPPSERVER_COMMON_NODE_H
 
@@ -14,22 +13,19 @@
 template <typename T>
 struct Node
 {
-    Node *pre{};
-    Node *next{};
-    int key = -1;
+    Node *pre  = nullptr;
+    Node *next = nullptr;
+    int   key  = -1;          // key = socket fd (int), -1 la sentinel
     std::unique_ptr<T> value;
 
-    Node()
-    {
-        value = std::make_unique<T>();
-    }
+    Node() { value = std::make_unique<T>(); }
 
     void Reset()
     {
-        pre = nullptr;
+        pre  = nullptr;
         next = nullptr;
-        key = -1;
-        if (value != nullptr)
+        key  = -1;
+        if (value)
             value->Reset();
     }
 };

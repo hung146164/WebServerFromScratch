@@ -11,29 +11,46 @@ endif()
 
 find_package(Threads REQUIRED)
 
-add_executable(webserver
-    src/main.cpp
-    src/NetworkServer.cpp
-    src/Worker.cpp
-    src/HttpParser.cpp
+# ─── Thư viện tĩnh lõi của Framework ────────────────────────────────────────
+add_library(webservervdt STATIC
+    src/network/NetworkServer.cpp
+    src/network/Worker.cpp
+    src/server/http/HttpRequest.cpp
+    src/server/http/JsonParser.cpp
+    src/server/http/Router.cpp
 )
 
-target_include_directories(webserver
-    PRIVATE
+target_include_directories(webservervdt
+    PUBLIC
     ${CMAKE_SOURCE_DIR}/include
 )
 
-target_compile_options(webserver PRIVATE
+target_compile_options(webservervdt PRIVATE
     -Wall
     -Wextra
     -Wpedantic
     -Wshadow
     -Wconversion
     -Wsign-conversion
+    -msse2 # SSE2 cho SIMD JSON parser (có trên mọi CPU x86_64)
 )
 
-target_link_libraries(webserver PRIVATE Threads::Threads)
+target_link_libraries(webservervdt PUBLIC Threads::Threads)
 
+# ─── Ứng dụng demo ────────────────────────────────────────────────────────────
+add_executable(webserver src/main.cpp)
+
+target_link_libraries(webserver PRIVATE webservervdt)
+
+target_compile_options(webserver PRIVATE -Wall -Wextra)
+
+# ─── Cài đặt (cho người dùng framework) ──────────────────────────────────────
+install(TARGETS webservervdt
+    ARCHIVE DESTINATION lib
+)
+install(DIRECTORY include/
+    DESTINATION include
+)
 install(TARGETS webserver
     RUNTIME DESTINATION bin
 )

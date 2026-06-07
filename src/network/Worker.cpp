@@ -1,24 +1,22 @@
 /*!
     \file Worker.cpp
-    \brief Worker implementation using Nginx-style event loop
+    \brief Worker implementation using epoll event loop
     \author HungForre
     \date 6/6/2026
     \copyright VDT
 */
-
 #include "network/Worker.h"
 #include "server/http/HttpParserState.h"
+#include "server/http/HttpResponse.h"
 
 #include <iostream>
 #include <sstream>
-#include <string>
 #include <cstring>
 #include <cerrno>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/socket.h>
 
-// ─── Helper: Đặt socket sang chế độ Non-Blocking ───────────────────────────
 static void set_nonblocking(int fd)
 {
     int flags = fcntl(fd, F_GETFL, 0);
@@ -28,15 +26,11 @@ static void set_nonblocking(int fd)
         return;
     }
     if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-    {
         std::cerr << "[Worker] fcntl F_SETFL O_NONBLOCK failed\n";
-    }
 }
 
-// ─── Constructor ─────────────────────────────────────────────────────────────
 Worker::Worker(int worker_id_, ServerConfig config_)
-    : worker_id(worker_id_),
-      config(config_),
+    : worker_id(worker_id_), config(config_),
       lru(config_.client_per_worker)
 {
     SetupWorker();
@@ -50,10 +44,9 @@ void Worker::SetupWorker()
         std::cerr << "[Worker " << worker_id << "] epoll_create1 failed\n";
         return;
     }
-    client_events.resize(static_cast<size_t>(config.max_epoll_events));
+    client_events.resize((int)config.max_epoll_events);
 }
 
-// ─── Event Loop chính ────────────────────────────────────────────────────────
 void Worker::StartWorker()
 {
     if (epollSocket.GetSocketfd() == -1)
@@ -63,26 +56,23 @@ void Worker::StartWorker()
     {
         int cnt = epoll_wait(epollSocket.GetSocketfd(),
                              client_events.data(),
-                             config.max_epoll_events, // Dùng config thay vì biến cũ
+                             config.max_epoll_events,
                              -1);
         if (cnt < 0)
         {
             if (errno == EINTR)
-                continue; // Bị ngắt bởi signal, tiếp tục
+                continue;
             std::cerr << "[Worker " << worker_id << "] epoll_wait error\n";
             break;
         }
 
-        for (int i = 0; i < cnt; i++)
+        for (int i = 0; i < cnt; ++i)
         {
             int fd = client_events[i].data.fd;
 
             if (client_events[i].events & (EPOLLHUP | EPOLLERR | EPOLLRDHUP))
             {
-                std::cout << "[Worker " << worker_id << "] Client " << fd << " ngắt kết nối.\n";
-                epoll_ctl(epollSocket.GetSocketfd(), EPOLL_CTL_DEL, fd, nullptr);
                 CloseConnection(fd);
-                current_conn--;
             }
             else if (client_events[i].events & EPOLLIN)
             {
@@ -92,26 +82,25 @@ void Worker::StartWorker()
     }
 }
 
-// ─── Quản lý kết nối ─────────────────────────────────────────────────────────
 void Worker::CloseConnection(int fd)
 {
     epoll_ctl(epollSocket.GetSocketfd(), EPOLL_CTL_DEL, fd, nullptr);
     close(fd);
-    lru.remove(fd);
+
+    if (lru.remove(fd))
+    {
+        current_conn--;
+    }
 }
 
 void Worker::AddClient(int client_fd)
 {
     if (lru.full())
     {
-        // LRU đầy: kick client cũ nhất ra để nhường chỗ
         int old_fd = lru.oldestKey();
         if (old_fd != -1)
         {
-            epoll_ctl(epollSocket.GetSocketfd(), EPOLL_CTL_DEL, old_fd, nullptr);
-            close(old_fd);
-            lru.remove(old_fd);
-            current_conn--;
+            CloseConnection(old_fd);
         }
     }
 
@@ -129,10 +118,10 @@ void Worker::AddClient(int client_fd)
     }
 
     lru.put(client_fd);
+
     current_conn++;
 }
 
-// ─── Xử lý Request ───────────────────────────────────────────────────────────
 void Worker::ProcessHttpRequest(int fd, HttpRequest *request)
 {
     Http::Router::Dispatch(fd, *request);
@@ -146,9 +135,8 @@ void Worker::SendStatusResponse(int fd, int status_code, std::string_view msg)
         << "Content-Length: " << msg.size() << "\r\n"
         << "Connection: close\r\n\r\n"
         << msg;
-
-    std::string response = oss.str();
-    send(fd, response.data(), response.size(), MSG_NOSIGNAL);
+    std::string res = oss.str();
+    send(fd, res.data(), res.size(), MSG_NOSIGNAL);
 }
 
 void Worker::HandleRequest(int fd)
@@ -157,12 +145,11 @@ void Worker::HandleRequest(int fd)
     if (!request)
         return;
 
-    int capacity = static_cast<int>(request->cache.size());
+    int capacity = (int)request->cache.size(); // buffer 64KB, int e du
 
     while (true)
     {
         int space = capacity - request->tail_idx;
-
         if (space <= 0)
         {
             SendStatusResponse(fd, 413, "Payload Too Large");
@@ -171,7 +158,7 @@ void Worker::HandleRequest(int fd)
         }
 
         char *write_ptr = &request->cache[request->tail_idx];
-        ssize_t bytes_read = recv(fd, write_ptr, static_cast<size_t>(space), 0);
+        ssize_t bytes_read = recv(fd, write_ptr, (int)space, 0);
 
         if (bytes_read < 0)
         {
@@ -188,7 +175,7 @@ void Worker::HandleRequest(int fd)
             return;
         }
 
-        request->tail_idx += static_cast<int>(bytes_read);
+        request->tail_idx += (int)bytes_read;
 
         bool connection_closed = false;
         while (true)
@@ -201,25 +188,21 @@ void Worker::HandleRequest(int fd)
 
                 int remain = request->tail_idx - request->curr_idx;
                 if (remain > 0)
-                {
                     std::memmove(&request->cache[0],
                                  &request->cache[request->curr_idx],
-                                 static_cast<size_t>(remain));
-                }
+                                 (int)remain);
                 request->NextRequest(remain);
                 continue;
             }
             else if (state == ErrorState::Instance())
             {
-                SendStatusResponse(fd, 400, "Bad Request");
+                Http::Error(fd, 400, "Bad Request");
                 CloseConnection(fd);
                 connection_closed = true;
                 break;
             }
             else
-            {
                 break;
-            }
         }
 
         if (connection_closed)
