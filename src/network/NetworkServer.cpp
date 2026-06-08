@@ -31,10 +31,12 @@ NetworkServer::NetworkServer(ServerConfig config_)
 void NetworkServer::SetupThread()
 {
     for (int i = 0; i < config.num_workers; ++i)
-        worker_instances.push_back(new Worker(i, config));
+    {
+        worker_instances.push_back(std::make_unique<Worker>(i, config));
+    }
 
     for (int i = 0; i < config.num_workers; ++i)
-        threads.emplace_back(&Worker::StartWorker, worker_instances[i]);
+        threads.emplace_back(&Worker::StartWorker, worker_instances[i].get());
 }
 
 NetworkServer::~NetworkServer()
@@ -42,9 +44,6 @@ NetworkServer::~NetworkServer()
     for (auto &t : threads)
         if (t.joinable())
             t.join();
-
-    for (auto w : worker_instances)
-        delete w;
 }
 
 void NetworkServer::SetupNetwork()
@@ -113,7 +112,7 @@ void NetworkServer::AcceptClient()
             break;
         }
 
-        worker_instances[next_worker]->AddClient(client_fd);
+        worker_instances[next_worker].get()->AddClient(client_fd);
         next_worker = (next_worker + 1) % config.num_workers;
     }
 }
