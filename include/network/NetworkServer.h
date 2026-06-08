@@ -12,6 +12,7 @@
 #include <vector>
 #include <thread>
 #include <sys/epoll.h>
+#include <memory>
 
 #include "common/SocketGuard.h"
 #include "network/Worker.h"
@@ -24,7 +25,7 @@ private:
 
     SocketGuard serverSocket;
     SocketGuard epollSocket;
-    std::vector<Worker *> worker_instances;
+    std::vector<std::unique_ptr<Worker>> worker_instances;
     std::vector<epoll_event> newClients;
     std::vector<std::thread> threads;
     std::atomic<bool> is_running{false};
