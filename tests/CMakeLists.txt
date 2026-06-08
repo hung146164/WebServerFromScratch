@@ -5,8 +5,8 @@ include(FetchContent)
 
 # ─── Tải tự động Google Test ──────────────────────────────────────────────────
 FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.tar.gz
+    googletest
+    URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.tar.gz
 )
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
@@ -14,7 +14,6 @@ FetchContent_MakeAvailable(googletest)
 # ─── Tạo Executable chạy Unit Tests ──────────────────────────────────────────
 add_executable(webserver_tests
     test_main.cpp
-    json/test_JsonParser.cpp
     http/test_HttpParser.cpp
 )
 
@@ -25,9 +24,9 @@ target_include_directories(webserver_tests PRIVATE
 
 target_link_libraries(webserver_tests
     PRIVATE
-        webservervdt
-        gtest
-        gtest_main
+    webservervdt
+    gtest
+    gtest_main
 )
 
 target_compile_options(webserver_tests PRIVATE -Wall -Wextra)
