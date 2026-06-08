@@ -42,6 +42,6 @@ namespace Http
         static HandlerFunc fallback_handler;
     };
 
-} // namespace Http
+}
 
 #endif // CPPSERVER_HTTP_ROUTER_H
