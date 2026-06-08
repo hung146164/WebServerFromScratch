@@ -23,6 +23,21 @@
 // ─── main ────────────────────────────────────────────────────────────────────
 signed main()
 {
+    Http::Router::Register(HttpMethod::GET, "/api/ping",
+                           [](int fd, const HttpRequest &req)
+                           {
+                               Http::JSON(fd, 200, R"({"status":"pong","server":"WebServerVdt"})");
+                           });
+    Http::Router::Register(HttpMethod::GET, "/api/download",
+                           [](int fd, const HttpRequest &req)
+                           {
+                               Http::ServeFile(fd, "/test-download-1.5GB.bin", "./www");
+                           });
+    Http::Router::RegisterFallback(
+        [](int fd, const HttpRequest &req)
+        {
+            Http::ServeFile(fd, req.http_url, "./www");
+        });
 
     ServerConfig cfg;
     cfg.port = 8081;

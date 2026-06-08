@@ -135,9 +135,40 @@ namespace Http
         header += std::to_string(file_size);
         header += "\r\nAccess-Control-Allow-Origin: *\r\nConnection: keep-alive\r\n\r\n";
         send(fd, header.data(), header.size(), MSG_NOSIGNAL);
-        // 9. Dùng sendfile() — kernel copy trực tiếp file→socket, không qua userspace RAM
+        // // 9. Dùng sendfile() — kernel copy trực tiếp file→socket, không qua userspace RAM
+        // off_t offset = 0;
+        // sendfile(fd, file_fd, &offset, (size_t)file_size);
+        // close(file_fd);
+
         off_t offset = 0;
-        sendfile(fd, file_fd, &offset, (size_t)file_size);
+        ssize_t remaining = (ssize_t)file_size;
+        while (remaining > 0)
+        {
+            ssize_t sent = sendfile(fd, file_fd, &offset, (size_t)remaining);
+            if (sent > 0)
+            {
+                remaining -= sent;
+            }
+            else if (sent == 0)
+            {
+                break; // Client đóng kết nối
+            }
+            else // sent < 0
+            {
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                {
+                    // Socket buffer đầy, chờ 1ms rồi thử lại
+                    fd_set wfds;
+                    FD_ZERO(&wfds);
+                    FD_SET(fd, &wfds);
+                    struct timeval tv{0, 1000}; // 1ms
+                    if (select(fd + 1, nullptr, &wfds, nullptr, &tv) <= 0)
+                        break;
+                    continue;
+                }
+                break; // Lỗi thực sự (EPIPE, ECONNRESET...)
+            }
+        }
         close(file_fd);
     }
 
