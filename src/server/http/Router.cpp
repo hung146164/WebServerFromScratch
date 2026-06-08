@@ -72,7 +72,6 @@ void Http::Router::Dispatch(int fd, const HttpRequest &req)
         return;
     }
 
-    // Chi dung PATH (bo query string) lam key tim kiem
     std::string path = ExtractPath(req.http_url);
     std::string key = MethodToString(req.method) + ":" + path;
 
@@ -83,7 +82,6 @@ void Http::Router::Dispatch(int fd, const HttpRequest &req)
         return;
     }
 
-    // Fallback handler (dung cho static file serving)
     if (fallback_handler)
     {
         fallback_handler(fd, req);
