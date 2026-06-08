@@ -12,6 +12,10 @@
 #include <string_view>
 #include <fstream>
 #include <filesystem>
+#include <sys/sendfile.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include "server/http/HttpResponse.h"
 
 namespace Http
@@ -107,22 +111,34 @@ namespace Http
             return;
         }
 
-        // 6. Mở file
-        std::ifstream file(canonical_file, std::ios::binary | std::ios::ate);
-        if (!file.is_open())
+        // 6. Lấy kích thước file
+        struct stat file_stat{};
+        if (stat(file_str.c_str(), &file_stat) < 0)
         {
             Error(fd, 404, "Not Found");
             return;
         }
-
-        // 7. Đọc toàn bộ nội dung file vào bộ nhớ
-        auto file_size = file.tellg();
-        file.seekg(0, std::ios::beg);
-        std::string content(static_cast<int>(file_size), '\0');
-        file.read(content.data(), file_size);
-
-        // 8. Gửi về client với MIME type đúng
-        SendRaw(fd, 200, MimeType(file_str), content);
+        off_t file_size = file_stat.st_size;
+        // 7. Mở file descriptor (sendfile cần fd, không dùng ifstream)
+        int file_fd = open(file_str.c_str(), O_RDONLY);
+        if (file_fd < 0)
+        {
+            Error(fd, 404, "Not Found");
+            return;
+        }
+        // 8. Gửi header trước
+        std::string header;
+        header.reserve(256);
+        header += "HTTP/1.1 200 OK\r\nContent-Type: ";
+        header += MimeType(file_str);
+        header += "\r\nContent-Length: ";
+        header += std::to_string(file_size);
+        header += "\r\nAccess-Control-Allow-Origin: *\r\nConnection: keep-alive\r\n\r\n";
+        send(fd, header.data(), header.size(), MSG_NOSIGNAL);
+        // 9. Dùng sendfile() — kernel copy trực tiếp file→socket, không qua userspace RAM
+        off_t offset = 0;
+        sendfile(fd, file_fd, &offset, (size_t)file_size);
+        close(file_fd);
     }
 
 } // namespace Http
