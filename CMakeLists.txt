@@ -16,7 +16,6 @@ add_library(webservervdt STATIC
     src/network/NetworkServer.cpp
     src/network/Worker.cpp
     src/server/http/HttpRequest.cpp
-    src/server/http/JsonParser.cpp
     src/server/http/Router.cpp
 )
 
@@ -57,6 +56,7 @@ install(TARGETS webserver
 
 # ─── Unit Tests ──────────────────────────────────────────────────────────────
 option(BUILD_TESTING "Build unit tests" ON)
+
 if(BUILD_TESTING)
     enable_testing()
     add_subdirectory(tests)
