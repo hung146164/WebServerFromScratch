@@ -9,7 +9,7 @@
 #define CPPSERVER_NETWORK_SERVERCONFIG_H
 
 #include <thread>
-#include <cstdint> // Thêm thư viện này để dùng uint16_t, uint32_t...
+#include <cstdint>
 
 struct ServerConfig
 {
