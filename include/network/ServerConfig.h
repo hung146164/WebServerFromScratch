@@ -13,13 +13,13 @@
 
 struct ServerConfig
 {
-    uint16_t port = 8080;
-    uint32_t num_workers = (uint32_t)std::thread::hardware_concurrency();
-    uint32_t client_per_worker = 5000;
-    int max_epoll_events = 1024;
-    int max_listen_queue = 1024;
-    uint32_t max_client_per_ip = 10;
-    uint32_t read_timeout_sec = 15;
+    uint16_t port = 8081;
+    int num_workers = std::thread::hardware_concurrency();
+    int client_per_worker = 100;
+    int max_epoll_events = 50;
+    int max_listen_queue = 50;
+    int max_client_per_ip = 2;
+    int read_timeout_sec = 15;
 };
 
-#endif // CPPSERVER_NETWORK_SERVERCONFIG_H
+#endif
