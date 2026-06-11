@@ -4,318 +4,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Học Viện Anh Ngữ — Quản Lý Học Viên</title>
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/style.css">
+    <title>C++ Server Tester</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* CSS Giao diện Dark mode xịn xò */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 50px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        h1 {
+            text-align: center;
+            font-weight: 800;
+            background: -webkit-linear-gradient(#00c6ff, #0072ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        button {
+            background: #00c6ff;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        button:hover {
+            background: #0072ff;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 114, 255, 0.4);
+        }
+
+        pre {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            color: #00ff88;
+            font-size: 14px;
+        }
+    </style>
 </head>
 
 <body>
-    <!-- Background Decorative Gradients -->
-    <div class="bg-glow bg-glow-1"></div>
-    <div class="bg-glow bg-glow-2"></div>
 
-    <header>
-        <div class="header-container">
-            <div class="logo">
-                <i class="fa-solid fa-graduation-cap header-icon"></i>
-                <div>
-                    <h1>HỌC VIỆN ANH NGỮ VDT</h1>
-                    <p>Hệ thống Quản lý Học viên chuyên nghiệp • Powered by C++ WebServerVdt</p>
-                </div>
-            </div>
-            <div class="header-actions">
-                <button class="btn btn-secondary" onclick="loadStudents()">
-                    <i class="fa-solid fa-rotate"></i> Làm mới danh sách
-                </button>
-            </div>
+    <div class="container">
+        <h1>🚀 C++ API Tester</h1>
+        <p style="text-align: center; margin-bottom: 40px; color: #ccc;">
+            Giao diện kiểm thử hệ thống WebServer High-Performance
+        </p>
+
+        <!-- Thẻ Test API JSON -->
+        <div class="card">
+            <h2>1. Kiểm tra API lấy dữ liệu</h2>
+            <p>Gọi vào endpoint <code>/api/ping</code> để lấy cục JSON.</p>
+            <button onclick="testPingApi()">⚡ Gọi API Ping</button>
+            <pre id="pingResult">Chưa có dữ liệu. Hãy bấm nút phía trên!</pre>
         </div>
-    </header>
 
-    <main class="dashboard-layout">
-        <!-- Cột trái: Form nhập liệu -->
-        <section class="card form-section" id="form-section">
-            <h2 id="form-title"><i class="fa-solid fa-user-plus icon-title"></i> Thêm học viên mới</h2>
-            <form id="student-form" onsubmit="handleFormSubmit(event)">
-                <div class="form-group">
-                    <label for="name">Họ và tên <span class="required">*</span></label>
-                    <div class="input-wrapper">
-                        <i class="fa-solid fa-user input-icon"></i>
-                        <input type="text" id="name" placeholder="Ví dụ: Nguyễn Văn A" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="class">Lớp học</label>
-                    <div class="input-wrapper">
-                        <i class="fa-solid fa-chalkboard-user input-icon"></i>
-                        <input type="text" id="class" placeholder="Ví dụ: IELTS 7.5">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="score">Điểm số (0 - 10)</label>
-                    <div class="input-wrapper">
-                        <i class="fa-solid fa-star input-icon"></i>
-                        <input type="number" id="score" placeholder="Ví dụ: 8.5" step="0.1" min="0" max="10">
-                    </div>
-                </div>
-                <div class="form-buttons">
-                    <button type="submit" id="btn-submit" class="btn btn-primary">
-                        <i class="fa-solid fa-plus"></i> Thêm học viên
-                    </button>
-                    <button type="button" id="btn-cancel" class="btn btn-danger" style="display: none;" onclick="cancelEdit()">
-                        <i class="fa-solid fa-xmark"></i> Hủy
-                    </button>
-                </div>
-            </form>
-        </section>
-
-        <!-- Cột phải: Bảng danh sách -->
-        <section class="card table-section">
-            <div class="table-header">
-                <h2><i class="fa-solid fa-users icon-title"></i> Danh sách học viên</h2>
-                <span class="badge" id="student-count">0 học viên</span>
-            </div>
-            <div class="table-container">
-                <table id="student-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Họ và tên</th>
-                            <th>Lớp học</th>
-                            <th>Điểm số</th>
-                            <th class="text-center">Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody id="student-body">
-                        <!-- Loading placeholder -->
-                        <tr>
-                            <td colspan="5" class="text-center text-muted py-4">
-                                <i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải dữ liệu...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    </main>
-
-    <!-- Toast Notification Container -->
-    <div id="toast-container"></div>
+        <!-- Thẻ Test Tải File -->
+        <div class="card">
+            <h2>2. Kiểm tra Tải File (Zero-Copy)</h2>
+            <p>Tải bức ảnh thông qua kỹ thuật Sendfile tốc độ cao.</p>
+            <button onclick="testDownload()" style="background: #00ff88; color: #000;">📥 Tải Ảnh de1.jpg</button>
+        </div>
+    </div>
 
     <script>
-        const API = 'http://localhost:8081/api/students';
-        let editingId = null;
-
-        // Hiển thị Toast thông báo đẹp mắt
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast toast-${type}`;
-            
-            let icon = 'fa-circle-check';
-            if (type === 'error') icon = 'fa-circle-exclamation';
-            if (type === 'info') icon = 'fa-circle-info';
-            
-            toast.innerHTML = `
-                <i class="fa-solid ${icon}"></i>
-                <div class="toast-content">${message}</div>
-            `;
-            container.appendChild(toast);
-            
-            // Xóa sau khi chạy xong animation
-            setTimeout(() => {
-                toast.classList.add('toast-fade-out');
-                toast.addEventListener('animationend', () => toast.remove());
-            }, 3000);
-        }
-        window.toast = showToast; // Gắn global
-
-        // Tải danh sách từ server
-        async function loadStudents() {
-            try {
-                const tbody = document.getElementById('student-body');
-                const res = await fetch(API);
-                if (!res.ok) throw new Error('Không thể lấy danh sách học viên');
-                
-                const data = await res.json();
-                document.getElementById('student-count').textContent = `${data.length} học viên`;
-                
-                if (data.length === 0) {
-                    tbody.innerHTML = `
-                        <tr>
-                            <td colspan="5" class="text-center text-muted py-4">
-                                <i class="fa-solid fa-box-open"></i> Danh sách trống. Hãy thêm học viên mới!
-                            </td>
-                        </tr>
-                    `;
-                    return;
-                }
-
-                tbody.innerHTML = data.map(s => {
-                    const score = parseFloat(s.score || 0).toFixed(1);
-                    // Quyết định màu sắc huy hiệu điểm số
-                    let scoreBadgeClass = 'score-low';
-                    if (score >= 8.0) scoreBadgeClass = 'score-high';
-                    else if (score >= 5.0) scoreBadgeClass = 'score-medium';
-
-                    return `
-                        <tr>
-                            <td><span class="id-badge">#${s.id}</span></td>
-                            <td class="font-semibold">${escapeHtml(s.name)}</td>
-                            <td><span class="class-tag">${escapeHtml(s.class || 'N/A')}</span></td>
-                            <td><span class="score-badge ${scoreBadgeClass}">${score}</span></td>
-                            <td class="text-center action-buttons">
-                                <button class="btn-action btn-edit" title="Sửa thông tin" 
-                                    onclick="editStudent(${s.id}, '${escapeJs(s.name)}', '${escapeJs(s.class)}', ${s.score})">
-                                    <i class="fa-solid fa-pen-to-square"></i>
-                                </button>
-                                <button class="btn-action btn-delete" title="Xóa học viên" 
-                                    onclick="deleteStudent(${s.id}, '${escapeJs(s.name)}')">
-                                    <i class="fa-solid fa-trash-can"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
-            } catch (error) {
-                window.toast(error.message, 'error');
-            }
-        }
-
-        // Kích hoạt chế độ sửa
-        function editStudent(id, name, className, score) {
-            editingId = id;
-            document.getElementById('form-title').innerHTML = `<i class="fa-solid fa-user-pen icon-title"></i> Cập nhật học viên <span class="id-text">#${id}</span>`;
-            document.getElementById('name').value = name;
-            document.getElementById('class').value = className;
-            document.getElementById('score').value = score;
-            
-            const submitBtn = document.getElementById('btn-submit');
-            submitBtn.innerHTML = `<i class="fa-solid fa-check"></i> Cập nhật`;
-            submitBtn.className = "btn btn-success";
-            
-            document.getElementById('btn-cancel').style.display = 'inline-block';
-            document.getElementById('form-section').classList.add('form-edit-active');
-            
-            // Scroll mượt lên form
-            document.getElementById('form-section').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // Hủy chế độ sửa
-        function cancelEdit() {
-            editingId = null;
-            document.getElementById('form-title').innerHTML = `<i class="fa-solid fa-user-plus icon-title"></i> Thêm học viên mới`;
-            document.getElementById('student-form').reset();
-            
-            const submitBtn = document.getElementById('btn-submit');
-            submitBtn.innerHTML = `<i class="fa-solid fa-plus"></i> Thêm học viên`;
-            submitBtn.className = "btn btn-primary";
-            
-            document.getElementById('btn-cancel').style.display = 'none';
-            document.getElementById('form-section').classList.remove('form-edit-active');
-        }
-
-        // Submit form (Thêm hoặc Cập nhật)
-        async function handleFormSubmit(e) {
-            e.preventDefault();
-            
-            const name = document.getElementById('name').value.trim();
-            const className = document.getElementById('class').value.trim();
-            const scoreVal = document.getElementById('score').value;
-            const score = scoreVal !== "" ? parseFloat(scoreVal) : 0.0;
-
-            if (!name) {
-                window.toast('Vui lòng điền họ tên học viên', 'error');
-                return;
-            }
-
-            const payload = { name, class: className, score };
-            
-            try {
-                let res;
-                if (editingId === null) {
-                    // Thêm mới (POST)
-                    res = await fetch(API, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                } else {
-                    // Cập nhật (PUT)
-                    payload.id = editingId;
-                    res = await fetch(API, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                }
-
-                const data = await res.json();
-
-                if (res.ok) {
-                    window.toast(editingId === null ? `Đã thêm thành công học viên ${data.name}` : `Đã cập nhật học viên ${data.name}`, 'success');
-                    cancelEdit();
-                    loadStudents();
-                } else {
-                    throw new Error(data.error || 'Đã có lỗi xảy ra');
-                }
-            } catch (error) {
-                window.toast(`Lỗi: ${error.message}`, 'error');
-            }
-        }
-
-        // Xóa học viên
-        async function deleteStudent(id, name) {
-            if (!confirm(`Bạn có chắc chắn muốn xóa học viên "${name}" (ID: #${id}) không?`)) {
-                return;
-            }
+        // Hàm gọi API lấy chuỗi JSON
+        async function testPingApi() {
+            const resBox = document.getElementById('pingResult');
+            resBox.textContent = "Đang gửi Request xuống Server C++...";
 
             try {
-                const res = await fetch(`${API}?id=${id}`, {
-                    method: 'DELETE'
-                });
-
-                if (res.ok) {
-                    window.toast(`Đã xóa thành công học viên "${name}"`, 'success');
-                    // Nếu đang sửa học viên này thì reset form
-                    if (editingId === id) {
-                        cancelEdit();
-                    }
-                    loadStudents();
-                } else {
-                    const data = await res.json().catch(() => ({}));
-                    throw new Error(data.error || 'Không thể xóa học viên');
+                // Cố gắng lấy dữ liệu từ API
+                const response = await fetch('/api/ping');
+                if (!response.ok) {
+                    throw new Error(`Server trả về lỗi: ${response.status}`);
                 }
-            } catch (error) {
-                window.toast(error.message, 'error');
+                const data = await response.json();
+
+                // Ép thành chuỗi JSON đẹp mắt và in ra màn hình
+                resBox.textContent = JSON.stringify(data, null, 4);
+            } catch (err) {
+                resBox.textContent = "❌ Lỗi: Có thể bạn chưa đăng ký API /api/ping trong file main.cpp\n\nChi tiết: " + err.message;
+                resBox.style.color = "#ff4444";
             }
         }
 
-        // Helper để tránh XSS
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/&/g, '&amp;')
-                      .replace(/</g, '&lt;')
-                      .replace(/>/g, '&gt;')
-                      .replace(/"/g, '&quot;')
-                      .replace(/'/g, '&#039;');
+        // Hàm kích hoạt tải file
+        function testDownload() {
+            // Điều hướng thẳng trình duyệt vào link ảnh, HTTP Header của Server sẽ ép nó Save As về máy
+            window.location.href = '/api/download_image/de1.jpg?download=true';
         }
-
-        // Helper để escape ký tự đặc biệt trong JS inline
-        function escapeJs(str) {
-            if (!str) return '';
-            return str.replace(/\\/g, '\\\\')
-                      .replace(/'/g, "\\'")
-                      .replace(/"/g, '\\"');
-        }
-
-        // Tải danh sách lần đầu
-        loadStudents();
     </script>
+
 </body>
 
 </html>
