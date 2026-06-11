@@ -1,6 +1,6 @@
 /*!
     \file Worker.cpp
-    \brief Worker implementation using epoll event loop
+    \brief Worker implementation
     \author HungForre
     \date 6/6/2026
     \copyright VDT
@@ -16,45 +16,76 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/socket.h>
-
-static void set_nonblocking(int fd)
-{
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1)
-    {
-        std::cerr << "[Worker] fcntl F_GETFL failed\n";
-        return;
-    }
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-        std::cerr << "[Worker] fcntl F_SETFL O_NONBLOCK failed\n";
-}
+#include <sys/epoll.h>
+#include <netinet/in.h>
+#include <unistd.h>
 
 Worker::Worker(int worker_id_, ServerConfig config_)
     : worker_id(worker_id_), config(config_),
       lru(config_.client_per_worker)
 {
-    SetupWorker();
+    SetupNetwork();
 }
-
-void Worker::SetupWorker()
+void Worker::SetupNetwork()
 {
-    epollSocket.SetSocketfd(epoll_create1(0));
-    if (epollSocket.GetSocketfd() == -1)
+    server_socket.SetSocketfd(socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0));
+
+    if (server_socket.GetSocketfd() < 0)
+    {
+        std::cerr << "[Server] Socket not initialized!\n";
+        return;
+    }
+
+    int opt = 1;
+    if (setsockopt(server_socket.GetSocketfd(), SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0)
+    {
+        std::cerr << "[Server] Set socket SO_REUSEPORT failed!\n";
+        return;
+    }
+
+    sockaddr_in server_addr{};
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons((uint16_t)config.port);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(server_socket.GetSocketfd(), (sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    {
+        std::cerr << "[Server] Bind failed!\n";
+        return;
+    }
+
+    if (listen(server_socket.GetSocketfd(), config.max_listen_queue) < 0)
+    {
+        std::cerr << "[Server] Listen failed!\n";
+        return;
+    }
+
+    epoll_socket.SetSocketfd(epoll_create1(0));
+    if (epoll_socket.GetSocketfd() == -1)
     {
         std::cerr << "[Worker " << worker_id << "] epoll_create1 failed\n";
         return;
     }
+    epoll_event ev{};
+    ev.events = EPOLLIN | EPOLLET;
+    ev.data.fd = server_socket.GetSocketfd();
+    if (epoll_ctl(epoll_socket.GetSocketfd(), EPOLL_CTL_ADD, server_socket.GetSocketfd(), &ev) < 0)
+    {
+        std::cerr << "[Worker " << worker_id << "] Failed to add server socket to epoll\n";
+    }
+
     client_events.resize((int)config.max_epoll_events);
 }
-
 void Worker::StartWorker()
 {
-    if (epollSocket.GetSocketfd() == -1)
+    if (epoll_socket.GetSocketfd() == -1)
         return;
+
+    std::cout << "[Worker " << worker_id << "] Event Loop started successfully.\n";
 
     while (true)
     {
-        int cnt = epoll_wait(epollSocket.GetSocketfd(),
+        int cnt = epoll_wait(epoll_socket.GetSocketfd(),
                              client_events.data(),
                              config.max_epoll_events,
                              -1);
@@ -70,11 +101,17 @@ void Worker::StartWorker()
         {
             int fd = client_events[i].data.fd;
 
-            if (client_events[i].events & (EPOLLHUP | EPOLLERR | EPOLLRDHUP))
+            if (client_events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR))
             {
                 CloseConnection(fd);
+                continue;
             }
-            else if (client_events[i].events & EPOLLIN)
+
+            if (fd == server_socket.GetSocketfd())
+            {
+                AcceptClient();
+            }
+            else
             {
                 HandleRequest(fd);
             }
@@ -84,42 +121,56 @@ void Worker::StartWorker()
 
 void Worker::CloseConnection(int fd)
 {
-    epoll_ctl(epollSocket.GetSocketfd(), EPOLL_CTL_DEL, fd, nullptr);
+    epoll_ctl(epoll_socket.GetSocketfd(), EPOLL_CTL_DEL, fd, nullptr);
     close(fd);
-
-    if (lru.remove(fd))
-    {
-        current_conn--;
-    }
+    lru.remove(fd);
 }
 
-void Worker::AddClient(int client_fd)
+void Worker::AcceptClient()
 {
-    if (lru.full())
+    sockaddr_in client_addr{};
+    socklen_t client_len = sizeof(client_addr);
+
+    while (true)
     {
-        int old_fd = lru.oldestKey();
-        if (old_fd != -1)
+        int client_fd = accept4(server_socket.GetSocketfd(),
+                                (sockaddr *)&client_addr,
+                                &client_len,
+                                SOCK_NONBLOCK | SOCK_CLOEXEC);
+
+        if (client_fd < 0)
         {
-            CloseConnection(old_fd);
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                break;
+            if (errno == EINTR)
+                continue;
+            if (errno == EMFILE || errno == ENFILE)
+                std::cerr << "[Worker " << worker_id << "] Warning: FD limit reached!\n";
+            break;
         }
+
+        if (lru.full())
+        {
+            int old_fd = lru.oldestKey();
+            if (old_fd != -1)
+            {
+                CloseConnection(old_fd);
+            }
+        }
+
+        epoll_event ev{};
+        ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
+        ev.data.fd = client_fd;
+
+        if (epoll_ctl(epoll_socket.GetSocketfd(), EPOLL_CTL_ADD, client_fd, &ev) < 0)
+        {
+            std::cerr << "[Worker " << worker_id << "] epoll_ctl ADD failed\n";
+            close(client_fd);
+            continue;
+        }
+
+        lru.put(client_fd);
     }
-
-    set_nonblocking(client_fd);
-
-    epoll_event ev{};
-    ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
-    ev.data.fd = client_fd;
-
-    if (epoll_ctl(epollSocket.GetSocketfd(), EPOLL_CTL_ADD, client_fd, &ev) < 0)
-    {
-        std::cerr << "[Worker " << worker_id << "] epoll_ctl ADD failed\n";
-        close(client_fd);
-        return;
-    }
-
-    lru.put(client_fd);
-
-    current_conn++;
 }
 
 void Worker::ProcessHttpRequest(int fd, HttpRequest *request)
@@ -127,16 +178,9 @@ void Worker::ProcessHttpRequest(int fd, HttpRequest *request)
     Http::Router::Dispatch(fd, *request);
 }
 
-void Worker::SendStatusResponse(int fd, int status_code, std::string_view msg)
+void Worker::SendStatusResponse(int fd, int status, std::string_view msg)
 {
-    std::ostringstream oss;
-    oss << "HTTP/1.1 " << status_code << " " << msg << "\r\n"
-        << "Content-Type: text/plain\r\n"
-        << "Content-Length: " << msg.size() << "\r\n"
-        << "Connection: close\r\n\r\n"
-        << msg;
-    std::string res = oss.str();
-    send(fd, res.data(), res.size(), MSG_NOSIGNAL);
+    Http::Error(fd, status, msg);
 }
 
 void Worker::HandleRequest(int fd)
@@ -145,14 +189,15 @@ void Worker::HandleRequest(int fd)
     if (!request)
         return;
 
-    int capacity = (int)request->cache.size(); // buffer 64KB, int e du
+    int capacity = (int)request->cache.size();
 
     while (true)
     {
         int space = capacity - request->tail_idx;
         if (space <= 0)
         {
-            SendStatusResponse(fd, 413, "Payload Too Large");
+            std::string error_msg = "Payload Too Large";
+            SendStatusResponse(fd, 413, error_msg);
             CloseConnection(fd);
             return;
         }
@@ -196,21 +241,18 @@ void Worker::HandleRequest(int fd)
             }
             else if (state == ErrorState::Instance())
             {
-                Http::Error(fd, 400, "Bad Request");
+                std::string error_msg = "Bad Request";
+                SendStatusResponse(fd, 400, error_msg);
                 CloseConnection(fd);
                 connection_closed = true;
                 break;
             }
             else
+                // dữ liệu chưa hoàn chỉnh
                 break;
         }
 
         if (connection_closed)
             return;
     }
-}
-
-int Worker::getConnCount()
-{
-    return current_conn.load();
 }

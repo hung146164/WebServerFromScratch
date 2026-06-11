@@ -189,13 +189,19 @@ const HttpParserState *StartHeaderCRState::HandleChar(char c, HttpRequest &req) 
     if (c != '\n')
         return ErrorState::Instance();
 
-    for (const auto &pair : req.header)
+        for (const auto &pair : req.header)
     {
-        std::string key(pair.first);
-        std::transform(key.begin(), key.end(), key.begin(), [](unsigned char ch)
-                       { return std::tolower(ch); });
-
-        if (key == "content-length")
+        std::string_view k = pair.first;
+        auto iequal = [](std::string_view a, std::string_view b)
+        {
+            if (a.size() != b.size())
+                return false;
+            for (size_t i = 0; i < a.size(); ++i)
+                if (std::tolower((unsigned char)a[i]) != (unsigned char)b[i])
+                    return false;
+            return true;
+        };
+        if (iequal(k, "content-length"))
         {
             try
             {
@@ -206,7 +212,7 @@ const HttpParserState *StartHeaderCRState::HandleChar(char c, HttpRequest &req) 
                 return ErrorState::Instance();
             }
         }
-        else if (key == "content-type")
+        else if (iequal(k, "content-type"))
         {
             req.content_type = pair.second;
         }

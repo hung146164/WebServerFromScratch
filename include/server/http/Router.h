@@ -25,16 +25,11 @@ namespace Http
     class Router
     {
     public:
-        /// Dang ky route cu the
-        /// Http::Router::Register(HttpMethod::GET, "/api/students", Handler);
+        // Chỉ cho đăng kí trước khi start
         static void Register(HttpMethod method, const std::string &path, HandlerFunc handler);
-
-        /// Dang ky fallback handler - duoc goi khi khong tim thay route nao
-        /// Dung de serve static files cho moi URL khong match
-        /// Http::Router::RegisterFallback(HandleStatic);
+        // Chỉ cho đăng kí trước khi start
         static void RegisterFallback(HandlerFunc handler);
 
-        /// Dieu huong request den Handler tuong ung
         static void Dispatch(int fd, const HttpRequest &req);
 
     private:
@@ -47,6 +42,6 @@ namespace Http
         static HandlerFunc fallback_handler;
     };
 
-} // namespace Http
+}
 
 #endif // CPPSERVER_HTTP_ROUTER_H

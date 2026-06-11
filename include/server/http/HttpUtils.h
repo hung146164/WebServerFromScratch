@@ -114,11 +114,6 @@ namespace Http
 
     // ─── Kiểm tra Content-Type ────────────────────────────────────────────────────
 
-    inline bool IsJson(const HttpRequest &req)
-    {
-        return req.content_type.find("application/json") != std::string_view::npos;
-    }
-
     inline bool IsFormData(const HttpRequest &req)
     {
         return req.content_type.find("application/x-www-form-urlencoded") != std::string_view::npos;

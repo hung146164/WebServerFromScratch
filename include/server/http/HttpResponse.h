@@ -83,25 +83,21 @@ namespace Http
 
     // ─── API công khai ────────────────────────────────────────────────────────────
 
-    /// Http::JSON(fd, 200, "{\"name\":\"Nam\"}");
     inline void JSON(int fd, int status, std::string_view body)
     {
         SendRaw(fd, status, "application/json; charset=utf-8", body);
     }
 
-    /// Http::HTML(fd, 200, "<h1>Hello</h1>");
     inline void HTML(int fd, int status, std::string_view body)
     {
         SendRaw(fd, status, "text/html; charset=utf-8", body);
     }
 
-    /// Http::Text(fd, 200, "pong");
     inline void Text(int fd, int status, std::string_view body)
     {
         SendRaw(fd, status, "text/plain; charset=utf-8", body);
     }
 
-    /// Http::Redirect(fd, "/login");
     inline void Redirect(int fd, std::string_view location)
     {
         std::ostringstream oss;

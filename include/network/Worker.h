@@ -27,14 +27,17 @@ private:
     int worker_id;
     ServerConfig config;
 
-    SocketGuard epollSocket;
+    SocketGuard server_socket;
+    SocketGuard epoll_socket;
+
     std::vector<epoll_event> client_events;
 
     LRUClient<HttpRequest> lru;
 
-    std::atomic<int> current_conn{0};
-
     void SetupWorker();
+    void SetupNetwork();
+
+    void AcceptClient();
     void HandleRequest(int fd);
     void CloseConnection(int fd);
     void ProcessHttpRequest(int fd, HttpRequest *request);
@@ -44,8 +47,6 @@ public:
     Worker(int worker_id_, ServerConfig config_);
 
     void StartWorker();
-    void AddClient(int client_fd);
-    int getConnCount();
 };
 
 #endif
