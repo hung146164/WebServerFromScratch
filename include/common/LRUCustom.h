@@ -26,7 +26,7 @@ private:
     size_t capacity = 0;
     int free_node_idx = -1;
 
-    void detach(int idx)
+    void Detach(int idx)
     {
         if (nodes[idx].pre != -1)
         {
@@ -44,7 +44,7 @@ private:
         nodes[idx].next = -1;
     }
 
-    void attach_head(int idx)
+    void AttachHead(int idx)
     {
         nodes[idx].next = head;
         nodes[idx].pre = -1;
@@ -71,7 +71,7 @@ public:
         }
     }
 
-    T *get(int key)
+    T *Get(int key)
     {
         auto it = dp.find(key);
         if (it == dp.end())
@@ -84,8 +84,14 @@ public:
         }
         return &nodes[it->second].value;
     }
+    T * GetWithoutMove(id_t{
+        auto it = dp.find(key);
+        if (it == dp.end())
+            return nullptr;
 
-    void put(int key)
+        return &nodes[it->second].value;
+    }
+    void Put(int key)
     {
         auto it = dp.find(key);
         if (it != dp.end())
@@ -120,7 +126,7 @@ public:
         dp[key] = curr_idx;
         attach_head(curr_idx);
     }
-    void put(int key, const T &value)
+    void Put(int key, const T &value)
     {
         auto it = dp.find(key);
         if (it != dp.end())
@@ -157,7 +163,7 @@ public:
         dp[key] = curr_idx;
         attach_head(curr_idx);
     }
-    bool remove(int key)
+    bool Remove(int key)
     {
         auto it = dp.find(key);
         if (it == dp.end())
@@ -173,8 +179,23 @@ public:
 
         return true;
     }
+    void MakeRecent(int fd)
+    {
+        auto it = dp.find(key);
+        if (it != dp.end())
+        {
+            int idx = it->second;
+            if (idx != head)
+            {
+                detach(idx);
+                attach_head(idx);
+            }
+        }
+    }
 
-    bool full() { return free_node_idx == -1; }
-    int oldestKey() { return tail; }
+    bool Full() {
+        return free_node_idx == -1; }
+    int OldestKey() {
+        return tail; }
 };
 #endif

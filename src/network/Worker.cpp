@@ -124,7 +124,7 @@ void Worker::CloseConnection(int fd)
 {
     epoll_ctl(epoll_socket.GetSocketfd(), EPOLL_CTL_DEL, fd, nullptr);
     close(fd);
-    lru.remove(fd);
+    lru.Remove(fd);
 }
 
 void Worker::AcceptClient()
@@ -150,9 +150,9 @@ void Worker::AcceptClient()
             break;
         }
 
-        if (lru.full())
+        if (lru.Full())
         {
-            int old_fd = lru.oldestKey();
+            int old_fd = lru.OldestKey();
             if (old_fd != -1)
             {
                 CloseConnection(old_fd);
@@ -170,7 +170,7 @@ void Worker::AcceptClient()
             continue;
         }
 
-        lru.put(client_fd);
+        lru.Put(client_fd);
     }
 }
 
@@ -181,7 +181,7 @@ void Worker::ProcessHttpRequest(int fd, HttpRequest *request)
 
 void Worker::HandleRequest(int fd)
 {
-    HttpRequest *request = lru.get(fd);
+    HttpRequest *request = lru.GetWithoutMove(fd);
     if (!request)
         return;
 
@@ -235,6 +235,7 @@ void Worker::HandleRequest(int fd)
                                  &request->cache[request->curr_idx],
                                  (int)remain);
                 request->NextRequest(remain);
+                lru.MakeRecent(fd);
                 continue;
             }
             else if (state == ErrorState::Instance())
