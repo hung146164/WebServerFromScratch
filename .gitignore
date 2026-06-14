@@ -1,6 +1,3 @@
-build
-www
-hehe
-tests
-test.exe
-test.cpp
+build/
+www/
+hehe/

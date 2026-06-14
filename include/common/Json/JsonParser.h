@@ -13,7 +13,6 @@
 
 #include "JsonNode.h"
 #include "JsonDocument.h"
-
 namespace Json
 {
     class JsonParser
@@ -22,22 +21,15 @@ namespace Json
     private:
         std::vector<JsonNode> node_pool;
         size_t current_node_idx = 0;
-        JsonNode GetNode()
-        {
-            if (current_node_idx < node_pool.size())
-            {
-                JsonNode curr = node_pool[current_node_idx];
-                current_node_idx++;
-                return curr;
-            }
-            return nullptr;
-        }
+
+        JsonNode *GetNode();
+        void CleanNode(JsonNode *node);
 
     public:
         JsonParser(int number_node_pool_);
         JsonDocument Parse(std::string_view body);
         void release(size_t marker);
     };
-};
+}
 
 #endif
