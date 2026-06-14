@@ -13,18 +13,18 @@
 template <typename T>
 struct Node
 {
-    Node *pre  = nullptr;
+    Node *pre = nullptr;
     Node *next = nullptr;
-    int   key  = -1;          // key = socket fd (int), -1 la sentinel
+    int key = -1; // key = socket fd (int), -1 la sentinel
     std::unique_ptr<T> value;
 
     Node() { value = std::make_unique<T>(); }
 
     void Reset()
     {
-        pre  = nullptr;
+        pre = nullptr;
         next = nullptr;
-        key  = -1;
+        key = -1;
         if (value)
             value->Reset();
     }
