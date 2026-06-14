@@ -15,7 +15,7 @@
 #include <string_view>
 #include <sys/epoll.h>
 
-#include "common/LRU.h"
+#include "common/LRUCustom.h"
 #include "common/SocketGuard.h"
 #include "server/http/HttpRequest.h"
 #include "server/http/Router.h"
@@ -32,7 +32,7 @@ private:
 
     std::vector<epoll_event> client_events;
 
-    LRUClient<HttpRequest> lru;
+    LRUCustom<HttpRequest> lru;
 
     void SetupWorker();
     void SetupNetwork();
@@ -41,7 +41,6 @@ private:
     void HandleRequest(int fd);
     void CloseConnection(int fd);
     void ProcessHttpRequest(int fd, HttpRequest *request);
-    void SendStatusResponse(int fd, int status_code, std::string_view msg);
 
 public:
     Worker(int worker_id_, ServerConfig config_);

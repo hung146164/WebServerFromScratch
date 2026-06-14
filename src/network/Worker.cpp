@@ -104,6 +104,7 @@ void Worker::StartWorker()
             if (client_events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR))
             {
                 CloseConnection(fd);
+
                 continue;
             }
 
@@ -178,11 +179,6 @@ void Worker::ProcessHttpRequest(int fd, HttpRequest *request)
     Http::Router::Dispatch(fd, *request);
 }
 
-void Worker::SendStatusResponse(int fd, int status, std::string_view msg)
-{
-    Http::Error(fd, status, msg);
-}
-
 void Worker::HandleRequest(int fd)
 {
     HttpRequest *request = lru.get(fd);
@@ -197,8 +193,10 @@ void Worker::HandleRequest(int fd)
         if (space <= 0)
         {
             std::string error_msg = "Payload Too Large";
-            SendStatusResponse(fd, 413, error_msg);
+            Http::Error(fd, 413, error_msg);
+
             CloseConnection(fd);
+
             return;
         }
 
@@ -242,7 +240,7 @@ void Worker::HandleRequest(int fd)
             else if (state == ErrorState::Instance())
             {
                 std::string error_msg = "Bad Request";
-                SendStatusResponse(fd, 400, error_msg);
+                Http::Error(fd, 400, error_msg);
                 CloseConnection(fd);
                 connection_closed = true;
                 break;

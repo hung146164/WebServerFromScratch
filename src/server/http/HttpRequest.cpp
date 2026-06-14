@@ -24,6 +24,12 @@ const HttpParserState *HttpRequest::Parse()
     return state;
 }
 
+HttpRequest::HttpRequest(int bufferSize = 65536)
+{
+    cache.resize(bufferSize);
+    Reset();
+}
+
 void HttpRequest::Reset()
 {
     state = StartState::Instance();
@@ -189,7 +195,7 @@ const HttpParserState *StartHeaderCRState::HandleChar(char c, HttpRequest &req) 
     if (c != '\n')
         return ErrorState::Instance();
 
-        for (const auto &pair : req.header)
+    for (const auto &pair : req.header)
     {
         std::string_view k = pair.first;
         auto iequal = [](std::string_view a, std::string_view b)

@@ -1,6 +1,6 @@
 /*!
     \file Node.h
-    \brief Node doubly-linked list cho LRU
+    \brief Node defination
     \author HungForre
     \date 6/6/2026
     \copyright VDT
@@ -13,20 +13,17 @@
 template <typename T>
 struct Node
 {
-    Node *pre = nullptr;
-    Node *next = nullptr;
-    int key = -1; // key = socket fd (int), -1 la sentinel
-    std::unique_ptr<T> value;
-
-    Node() { value = std::make_unique<T>(); }
+    T value;
+    int pre = -1;
+    int next = -1;
+    int key = -1;
 
     void Reset()
     {
-        pre = nullptr;
-        next = nullptr;
+        pre = -1;
+        next = -1;
         key = -1;
-        if (value)
-            value->Reset();
+        value.Reset();
     }
 };
 #endif

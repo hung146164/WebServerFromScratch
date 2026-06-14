@@ -37,11 +37,7 @@ struct HttpRequest
 
     std::vector<char> cache;
 
-    HttpRequest(int bufferSize = 65536)
-    {
-        cache.resize(bufferSize);
-        Reset();
-    }
+    HttpRequest(int bufferSize = 65536);
 
     // Chạy vòng lặp phân tích cú pháp
     const HttpParserState *Parse();
