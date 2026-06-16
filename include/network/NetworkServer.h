@@ -37,6 +37,7 @@ public:
     ~NetworkServer();
     void Start();
     void Stop();
+    void ReloadConfig();
 };
 
 #endif

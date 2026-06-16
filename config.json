@@ -1,0 +1,10 @@
+{
+  "port": 8081,
+  "num_workers": 2,
+  "client_per_worker": 1000,
+  "max_epoll_events": 128,
+  "max_listen_queue": 128,
+  "max_client_per_ip": 128,
+  "read_timeout_sec": 15,
+  "rate_limit_per_sec": 10
+}

@@ -77,18 +77,21 @@ public:
         if (it == dp.end())
             return nullptr;
 
+        nodes[it->second].last_active_time = time(nullptr);
         if (it->second != head)
         {
-            detach(it->second);
-            attach_head(it->second);
+            Detach(it->second);
+            AttachHead(it->second);
         }
         return &nodes[it->second].value;
     }
-    T * GetWithoutMove(id_t{
+    T * GetWithoutMove(int key)
+    {
         auto it = dp.find(key);
         if (it == dp.end())
             return nullptr;
 
+        nodes[it->second].last_active_time = time(nullptr);
         return &nodes[it->second].value;
     }
     void Put(int key)
@@ -97,10 +100,11 @@ public:
         if (it != dp.end())
         {
             int idx = it->second;
+            nodes[idx].last_active_time = time(nullptr);
             if (idx != head)
             {
-                detach(idx);
-                attach_head(idx);
+                Detach(idx);
+                AttachHead(idx);
             }
             return;
         }
@@ -110,7 +114,7 @@ public:
             int delete_node_idx = tail;
             int old_key = nodes[delete_node_idx].key;
 
-            detach(delete_node_idx);
+            Detach(delete_node_idx);
             dp.erase(old_key);
             nodes[delete_node_idx].Reset();
 
@@ -122,9 +126,10 @@ public:
         free_node_idx = next[free_node_idx];
 
         nodes[curr_idx].key = key;
+        nodes[curr_idx].last_active_time = time(nullptr);
 
         dp[key] = curr_idx;
-        attach_head(curr_idx);
+        AttachHead(curr_idx);
     }
     void Put(int key, const T &value)
     {
@@ -133,10 +138,11 @@ public:
         {
             int idx = it->second;
             nodes[idx].value = value;
+            nodes[idx].last_active_time = time(nullptr);
             if (idx != head)
             {
-                detach(idx);
-                attach_head(idx);
+                Detach(idx);
+                AttachHead(idx);
             }
             return;
         }
@@ -146,7 +152,7 @@ public:
             int delete_node_idx = tail;
             int old_key = nodes[delete_node_idx].key;
 
-            detach(delete_node_idx);
+            Detach(delete_node_idx);
             dp.erase(old_key);
             nodes[delete_node_idx].Reset();
 
@@ -159,9 +165,10 @@ public:
 
         nodes[curr_idx].key = key;
         nodes[curr_idx].value = value;
+        nodes[curr_idx].last_active_time = time(nullptr);
 
         dp[key] = curr_idx;
-        attach_head(curr_idx);
+        AttachHead(curr_idx);
     }
     bool Remove(int key)
     {
@@ -170,7 +177,7 @@ public:
             return false;
 
         int idx = it->second;
-        detach(idx);
+        Detach(idx);
         dp.erase(it);
         nodes[idx].Reset();
 
@@ -181,21 +188,32 @@ public:
     }
     void MakeRecent(int fd)
     {
-        auto it = dp.find(key);
+        auto it = dp.find(fd);
         if (it != dp.end())
         {
             int idx = it->second;
+            nodes[idx].last_active_time = time(nullptr);
             if (idx != head)
             {
-                detach(idx);
-                attach_head(idx);
+                Detach(idx);
+                AttachHead(idx);
             }
         }
+    }
+
+    time_t GetLastActiveTime(int key)
+    {
+        auto it = dp.find(key);
+        if (it == dp.end())
+            return 0;
+        return nodes[it->second].last_active_time;
     }
 
     bool Full() {
         return free_node_idx == -1; }
     int OldestKey() {
-        return tail; }
+        if (tail == -1) return -1;
+        return nodes[tail].key;
+    }
 };
 #endif
