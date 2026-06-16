@@ -24,7 +24,7 @@ const HttpParserState *HttpRequest::Parse()
     return state;
 }
 
-HttpRequest::HttpRequest(int bufferSize = 65536)
+HttpRequest::HttpRequest(int bufferSize)
 {
     cache.resize(bufferSize);
     Reset();
@@ -42,6 +42,7 @@ void HttpRequest::Reset()
     tail_idx = 0;
     start_idx = 0;
     curr_idx = 0;
+    client_ip.clear();
 }
 
 void HttpRequest::NextRequest(int new_tail)
@@ -56,6 +57,7 @@ void HttpRequest::NextRequest(int new_tail)
     curr_idx = 0;
     start_idx = 0;
     tail_idx = new_tail;
+    client_ip.clear();
 }
 
 static inline int span(int from, int to) { return (int)(to - from); }
