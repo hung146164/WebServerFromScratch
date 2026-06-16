@@ -34,6 +34,8 @@ private:
 
     LRUCustom<HttpRequest> lru;
 
+    std::atomic<bool> is_running{true};
+
     void SetupWorker();
     void SetupNetwork();
 
@@ -46,6 +48,7 @@ public:
     Worker(int worker_id_, ServerConfig config_);
 
     void StartWorker();
+    void StopWorker();
 };
 
 #endif
