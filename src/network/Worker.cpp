@@ -18,7 +18,12 @@
 #include <sys/socket.h>
 #include <sys/epoll.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <unistd.h>
+#include <sched.h>
+#include <pthread.h>
+
+thread_local int current_worker_id = -1;
 
 Worker::Worker(int worker_id_, ServerConfig config_)
     : worker_id(worker_id_), config(config_),
@@ -50,9 +55,10 @@ void Worker::SetupNetwork()
 
     if (bind(server_socket.GetSocketfd(), (sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
-        std::cerr << "[Server] Bind failed!\n";
+        std::cerr << "[Server] Bind failed on port " << config.port << "!\n";
         return;
     }
+    std::cout << "[Worker " << worker_id << "] Bound and listening on port " << config.port << "\n";
 
     if (listen(server_socket.GetSocketfd(), config.max_listen_queue) < 0)
     {
@@ -81,20 +87,54 @@ void Worker::StartWorker()
     if (epoll_socket.GetSocketfd() == -1)
         return;
 
-    std::cout << "[Worker " << worker_id << "] Event Loop started successfully.\n";
+    current_worker_id = worker_id;
 
-    while (true)
+#ifndef __APPLE__
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(worker_id % std::thread::hardware_concurrency(), &cpuset);
+    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+#endif
+
+    std::cout << "[Worker " << worker_id << "] Event Loop started successfully on CPU Core "
+              << (worker_id % std::thread::hardware_concurrency()) << "\n";
+    is_running = true;
+
+    while (is_running)
     {
         int cnt = epoll_wait(epoll_socket.GetSocketfd(),
                              client_events.data(),
                              config.max_epoll_events,
-                             -1);
+                             500); // 500ms timeout
         if (cnt < 0)
         {
             if (errno == EINTR)
                 continue;
             std::cerr << "[Worker " << worker_id << "] epoll_wait error\n";
             break;
+        }
+        if (cnt == 0)
+        {
+
+            time_t now = time(nullptr);
+            while (true)
+            {
+                int oldest_fd = lru.OldestKey();
+                if (oldest_fd == -1)
+                    break;
+
+                time_t last_active = lru.GetLastActiveTime(oldest_fd);
+                if (now - last_active > config.read_timeout_sec)
+                {
+                    std::cout << "[Timeout] Closing idle client fd " << oldest_fd << " on Worker " << worker_id << "\n";
+                    CloseConnection(oldest_fd);
+                }
+                else
+                {
+                    break;
+                }
+            }
+            continue;
         }
 
         for (int i = 0; i < cnt; ++i)
@@ -118,11 +158,24 @@ void Worker::StartWorker()
             }
         }
     }
+    std::cout << "[Worker " << worker_id << "] Event Loop stopped.\n";
+}
+
+void Worker::StopWorker()
+{
+    is_running = false;
 }
 
 void Worker::CloseConnection(int fd)
 {
     epoll_ctl(epoll_socket.GetSocketfd(), EPOLL_CTL_DEL, fd, nullptr);
+
+    shutdown(fd, SHUT_WR);
+    char buf[128];
+    while (recv(fd, buf, sizeof(buf), 0) > 0)
+    {
+    }
+
     close(fd);
     lru.Remove(fd);
 }
@@ -171,6 +224,15 @@ void Worker::AcceptClient()
         }
 
         lru.Put(client_fd);
+        HttpRequest *req = lru.GetWithoutMove(client_fd);
+        if (req)
+        {
+            char ip_str[INET_ADDRSTRLEN];
+            if (inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN))
+            {
+                req->client_ip = ip_str;
+            }
+        }
     }
 }
 
@@ -247,7 +309,7 @@ void Worker::HandleRequest(int fd)
                 break;
             }
             else
-                // dữ liệu chưa hoàn chỉnh
+
                 break;
         }
 
