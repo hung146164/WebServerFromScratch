@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benchmark Băng Thông - WebServerVdt</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .benchmark-grid {
+      display: grid;
+      grid-template-columns: 1fr 3fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .stats-dashboard {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+    .stat-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-card);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 2.25rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--accent-cyan);
+      margin-top: 0.25rem;
+    }
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    @media (max-width: 768px) {
+      .benchmark-grid {
+        grid-template-columns: 1fr;
+      }
+      .stats-dashboard {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-container">
+        <div class="logo-icon">V</div>
+        <div class="logo-text">WebServerVdt</div>
+      </div>
+      <nav>
+        <a href="index.html">Dashboard</a>
+        <a href="test_features.html">Tính năng</a>
+        <a href="test_benchmark.html" class="active">Hiệu năng</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="badge badge-info">Hiệu Năng Thực Tế</div>
+      <h1>Benchmark Băng Thông & Tải</h1>
+      <p>Thực hiện đo lường tải trực tiếp từ trình duyệt để đánh giá khả năng chịu tải, băng thông tối đa và độ trễ phản hồi của máy chủ.</p>
+    </section>
+
+    <div class="benchmark-grid">
+      <!-- Controls Panel -->
+      <div class="card" style="height: fit-content;">
+        <h2>Cấu Hình Tải</h2>
+        <p>Điều chỉnh các thông số để giả lập nhiều kết nối đồng thời từ client.</p>
+        
+        <div class="form-group">
+          <label>Endpoint Mục Tiêu:</label>
+          <select id="bench-endpoint">
+            <option value="index.html">index.html (Tệp tĩnh nhỏ)</option>
+            <option value="style.css">style.css (Tệp tĩnh lớn hơn)</option>
+            <option value="heavy_file.bin">heavy_file.bin (Tệp tĩnh cực lớn - 50MB)</option>
+            <option value="heavy_1.5gb.bin">heavy_1.5gb.bin (Tệp tĩnh khổng lồ - 1.5GB)</option>
+            <option value="api-secure">POST /api/secure_data (API Động)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Số Luồng Đồng Thời (Concurrency):</label>
+          <input type="number" id="bench-concurrency" value="10" min="1" max="100">
+          <span style="font-size:0.75rem; color:var(--text-muted);">Số lượng vòng lặp yêu cầu song song.</span>
+        </div>
+
+        <div class="form-group">
+          <label>Thời Gian Đo (Duration):</label>
+          <select id="bench-duration">
+            <option value="5">5 Giây</option>
+            <option value="10" selected>10 Giây</option>
+            <option value="20">20 Giây</option>
+            <option value="30">30 Giây</option>
+          </select>
+        </div>
+
+        <button class="btn btn-primary" id="btn-start-bench" style="width: 100%; margin-top: 1rem;">Bắt đầu Đo</button>
+        <button class="btn btn-secondary" id="btn-stop-bench" style="width: 100%; margin-top: 0.5rem; display: none;">Dừng Khẩn Cấp</button>
+      </div>
+
+      <!-- Stats Panel -->
+      <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem;">
+            <h2>Chỉ Số Hiệu Năng Thực Tế</h2>
+            <div id="bench-status-badge" class="badge badge-info">Sẵn sàng</div>
+          </div>
+          
+          <div class="stats-dashboard">
+            <div class="stat-card">
+              <div class="stat-label">Requests Per Second (RPS)</div>
+              <div class="stat-val" id="stat-rps">0.0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Băng thông (Throughput)</div>
+              <div class="stat-val" id="stat-throughput">0.00 MB/s</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Độ Trễ Trung Bình (Latency)</div>
+              <div class="stat-val" id="stat-latency">0.0 ms</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Tổng Request (Thành công/Lỗi)</div>
+              <div class="stat-val" id="stat-requests" style="font-size: 1.8rem; color: var(--text-primary);">0 / 0</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary);">
+            <span>Tiến độ Benchmark:</span>
+            <span id="bench-progress-percent">0%</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar" id="bench-progress-bar"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Console Output -->
+    <div class="card console-section">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem;">
+        <h2>Nhật ký tiến trình đo lường</h2>
+        <button class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" id="btn-clear-logs">Clear Logs</button>
+      </div>
+      <div class="terminal">
+        <div class="terminal-header">
+          <span class="dot dot-red"></span>
+          <span class="dot dot-yellow"></span>
+          <span class="dot dot-green"></span>
+        </div>
+        <div class="terminal-content" id="benchmark-logs">
+          <div class="terminal-log log-info">[SYSTEM] Trình kiểm thử tải đã tải xong. Cấu hình số luồng và nhấn "Bắt đầu Đo".</div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <p>© 2026 WebServerVdt. Dự án Lập trình Hệ thống nâng cao - Viettel Digital Talent.</p>
+    </footer>
+  </div>
+
+  <script>
+    let isRunning = false;
+    let stopSignal = false;
+    let bytesReceived = 0;
+    let successCount = 0;
+    let failCount = 0;
+    let totalLatency = 0; // Tổng latency tính bằng ms
+    let latencyCount = 0;
+    let startTime = 0;
+    let intervalId = null;
+
+    function logToConsole(message, type = 'info') {
+      const logs = document.getElementById('benchmark-logs');
+      const time = new Date().toLocaleTimeString();
+      const logDiv = document.createElement('div');
+      logDiv.className = `terminal-log log-${type}`;
+      logDiv.textContent = `[${time}] ${message}`;
+      logs.appendChild(logDiv);
+      document.querySelector('.terminal').scrollTop = document.querySelector('.terminal').scrollHeight;
+    }
+
+    document.getElementById('btn-clear-logs').addEventListener('click', () => {
+      document.getElementById('benchmark-logs').innerHTML = '';
+      logToConsole('Logs cleared.', 'info');
+    });
+
+    document.getElementById('btn-start-bench').addEventListener('click', startBenchmark);
+    document.getElementById('btn-stop-bench').addEventListener('click', stopBenchmark);
+
+    function stopBenchmark() {
+      if (!isRunning) return;
+      stopSignal = true;
+      logToConsole('Đang gửi tín hiệu dừng khẩn cấp...', 'warning');
+    }
+
+    async function startBenchmark() {
+      if (isRunning) return;
+
+      const endpointType = document.getElementById('bench-endpoint').value;
+      const concurrency = parseInt(document.getElementById('bench-concurrency').value) || 10;
+      const durationSeconds = parseInt(document.getElementById('bench-duration').value) || 10;
+
+      // Reset counters
+      bytesReceived = 0;
+      successCount = 0;
+      failCount = 0;
+      totalLatency = 0;
+      latencyCount = 0;
+      isRunning = true;
+      stopSignal = false;
+
+      // Update UI
+      document.getElementById('btn-start-bench').style.display = 'none';
+      document.getElementById('btn-stop-bench').style.display = 'inline-flex';
+      document.getElementById('bench-status-badge').textContent = 'Đang chạy';
+      document.getElementById('bench-status-badge').className = 'badge badge-error';
+      
+      logToConsole(`Khởi động Benchmark: Endpoint=${endpointType}, Concurrency=${concurrency}, Duration=${durationSeconds}s`, 'warning');
+
+      startTime = performance.now();
+      const testDurationMs = durationSeconds * 1000;
+      
+      // Khởi chạy các worker luồng song song giả lập
+      const workers = [];
+      for (let w = 0; w < concurrency; w++) {
+        workers.push(runWorkerLoop(endpointType, testDurationMs));
+      }
+
+      // Vòng lặp cập nhật UI mỗi 200ms
+      intervalId = setInterval(() => {
+        const elapsedSec = (performance.now() - startTime) / 1000;
+        const progressPercent = Math.min((elapsedSec / durationSeconds) * 100, 100);
+        
+        document.getElementById('bench-progress-bar').style.width = `${progressPercent}%`;
+        document.getElementById('bench-progress-percent').textContent = `${Math.round(progressPercent)}%`;
+
+        updateDashboard(elapsedSec);
+      }, 200);
+
+      // Chờ cho tất cả worker hoàn thành hoặc hết giờ
+      await Promise.all(workers);
+
+      // Dọn dẹp
+      clearInterval(intervalId);
+      isRunning = false;
+      
+      const actualElapsedSec = (performance.now() - startTime) / 1000;
+      updateDashboard(actualElapsedSec);
+
+      document.getElementById('bench-progress-bar').style.width = `100%`;
+      document.getElementById('bench-progress-percent').textContent = `100%`;
+      document.getElementById('btn-start-bench').style.display = 'inline-flex';
+      document.getElementById('btn-stop-bench').style.display = 'none';
+      document.getElementById('bench-status-badge').textContent = 'Hoàn thành';
+      document.getElementById('bench-status-badge').className = 'badge badge-success';
+
+      logToConsole(`Benchmark hoàn thành sau ${actualElapsedSec.toFixed(2)}s! Tổng request: ${successCount + failCount}`, 'success');
+      logToConsole(`RPS cuối: ${(successCount / actualElapsedSec).toFixed(1)} req/s | Avg Latency: ${(totalLatency / (latencyCount || 1)).toFixed(1)} ms | Băng thông: ${(bytesReceived / 1024 / 1024 / actualElapsedSec).toFixed(2)} MB/s`, 'success');
+    }
+
+    async function runWorkerLoop(endpointType, testDurationMs) {
+      let targetUrl = '';
+      let fetchOptions = { cache: 'no-store' };
+
+      if (endpointType === 'index.html') {
+        targetUrl = 'index.html';
+      } else if (endpointType === 'style.css') {
+        targetUrl = 'style.css';
+      } else if (endpointType === 'heavy_file.bin') {
+        targetUrl = 'heavy_file.bin';
+      } else if (endpointType === 'heavy_1.5gb.bin') {
+        targetUrl = 'heavy_1.5gb.bin';
+      } else if (endpointType === 'api-secure') {
+        targetUrl = '/api/secure_data';
+        fetchOptions = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: new Uint8Array(32) // gửi 32 bytes rác đã mã hóa tượng trưng
+        };
+      }
+
+      while (performance.now() - startTime < testDurationMs && !stopSignal) {
+        const reqStart = performance.now();
+        try {
+          const res = await fetch(targetUrl, fetchOptions);
+          const reqEnd = performance.now();
+          
+          totalLatency += (reqEnd - reqStart);
+          latencyCount++;
+
+          if (res.ok) {
+            successCount++;
+            
+            // Xử lý đọc stream từng chunk để đo băng thông mà không lưu trữ trong RAM tránh tràn bộ nhớ trình duyệt
+            const reader = res.body.getReader();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              if (value) {
+                bytesReceived += value.length;
+              }
+            }
+          } else {
+            failCount++;
+            // Vẫn tính băng thông phản hồi lỗi (thường rất bé)
+            const text = await res.text();
+            bytesReceived += text.length;
+          }
+        } catch (err) {
+          failCount++;
+          // Không thể tính latency cho request lỗi kết nối cứng
+        }
+      }
+    }
+
+    function updateDashboard(elapsedSec) {
+      if (elapsedSec <= 0) return;
+      const rps = successCount / elapsedSec;
+      const throughputMB = (bytesReceived / 1024 / 1024) / elapsedSec;
+      const avgLatency = totalLatency / (latencyCount || 1);
+
+      document.getElementById('stat-rps').textContent = rps.toFixed(1);
+      document.getElementById('stat-throughput').textContent = `${throughputMB.toFixed(2)} MB/s`;
+      document.getElementById('stat-latency').textContent = `${avgLatency.toFixed(1)} ms`;
+      document.getElementById('stat-requests').textContent = `${successCount} / ${failCount}`;
+    }
+  </script>
+</body>
+</html>
