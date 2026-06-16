@@ -25,6 +25,8 @@ namespace Http
     class Router
     {
     public:
+        static int rate_limit_per_sec;
+
         // Chỉ cho đăng kí trước khi start
         static void Register(HttpMethod method, const std::string &path, HandlerFunc handler);
         // Chỉ cho đăng kí trước khi start
