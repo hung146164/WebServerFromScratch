@@ -67,9 +67,9 @@ namespace Http
         return "application/octet-stream";
     }
 
-    inline void ServeFile(int fd, std::string_view url_path, std::string_view web_root, std::string_view req_range = "")
+    inline void ServeFile(int fd, const HttpRequest &req, std::string_view web_root, std::string_view req_range = "")
     {
-
+        std::string_view url_path = req.http_url;
         bool force_download = false;
         auto qpos = url_path.find('?');
         if (qpos != std::string_view::npos)
@@ -100,9 +100,6 @@ namespace Http
         std::string file_str = canonical_file.string();
         std::string root_str = canonical_root.string();
 
-        std::cerr << file_str << '\n';
-        std::cerr << file_str << '\n';
-
         // 5. Kiểm tra bảo mật
         if (file_str.size() < root_str.size() || file_str.substr(0, root_str.size()) != root_str)
         {
@@ -119,6 +116,30 @@ namespace Http
         }
         off_t file_size = file_stat.st_size;
 
+        // Caching: Tạo tiêu đề Last-Modified dạng GMT
+        char last_mod_str[64];
+        struct tm *tm_info = std::gmtime(&file_stat.st_mtime);
+        std::strftime(last_mod_str, sizeof(last_mod_str), "%a, %d %b %Y %H:%M:%S GMT", tm_info);
+
+        // Kiểm tra If-Modified-Since từ client
+        std::string_view if_mod_since = "";
+        auto it_mod = req.header.find("If-Modified-Since");
+        if (it_mod != req.header.end())
+        {
+            if_mod_since = it_mod->second;
+        }
+
+        if (!if_mod_since.empty() && if_mod_since == last_mod_str)
+        {
+            // File không đổi, trả về 304 rỗng để tiết kiệm băng thông mạng
+            std::string res = "HTTP/1.1 304 Not Modified\r\n"
+                              "Last-Modified: " +
+                              std::string(last_mod_str) + "\r\n"
+                                                          "Connection: keep-alive\r\n\r\n";
+            send(fd, res.data(), res.size(), MSG_NOSIGNAL);
+            return;
+        }
+
         // 7. Mở file
         int file_fd = open(file_str.c_str(), O_RDONLY);
         if (file_fd < 0)
@@ -127,7 +148,7 @@ namespace Http
             return;
         }
 
-        // ---- TÍNH NĂNG MỚI: Trích xuất Tên file từ đường dẫn ----
+        // ---- Trích xuất Tên file từ đường dẫn tương đối ----
         std::string_view filename = rel_path;
         auto slash_pos = filename.rfind('/');
         if (slash_pos != std::string_view::npos)
@@ -135,7 +156,7 @@ namespace Http
             filename = filename.substr(slash_pos + 1);
         }
 
-        // ---- TÍNH NĂNG MỚI: Xử lý Tải Tiếp (IDM / Pause & Resume) ----
+        // ---- Xử lý Tải Tiếp (IDM / Pause & Resume) ----
         off_t offset = 0;
         off_t send_size = file_size;
         bool is_partial = false;
@@ -180,19 +201,22 @@ namespace Http
         }
 
         header += "Content-Type: ";
-        header += MimeType(file_str);
+        header += MimeType(rel_path); // FIX: Dùng rel_path thay vì file_str để tránh sai đuôi mở rộng khi root path có dấu "."
         header += "\r\nContent-Length: ";
         header += std::to_string(send_size);
         header += "\r\n";
-        // ---- TÍNH NĂNG MỚI: Ép trình duyệt "Save As" ----
+
+        // ---- Ép trình duyệt "Save As" ----
         if (force_download)
         {
             header += "Content-Disposition: attachment; filename=\"";
             header += filename;
             header += "\"\r\n";
         }
+        header += "Last-Modified: " + std::string(last_mod_str) + "\r\n";
         header += "Access-Control-Allow-Origin: *\r\nConnection: keep-alive\r\n\r\n";
         send(fd, header.data(), header.size(), MSG_NOSIGNAL);
+
         // 9. Vòng lặp bơm dữ liệu Zero-Copy
         ssize_t remaining = (ssize_t)send_size;
         int timeout_count = 0; // Đếm số lần bị nghẽn mạng liên tiếp
@@ -207,7 +231,7 @@ namespace Http
             }
             else if (sent == 0)
             {
-                break; // Client (trình duyệt) chủ động đóng kết nối
+                break; // Client chủ động đóng kết nối
             }
             else // sent < 0
             {
@@ -217,26 +241,21 @@ namespace Http
                     FD_ZERO(&wfds);
                     FD_SET(fd, &wfds);
 
-                    // ---- SỬA LỖI BUG NGHIÊM TRỌNG Ở CODE CŨ ----
-                    // Code cũ: tv{0, 1000} (1ms). Nếu mạng kẹt 1 mili-giây, lệnh select báo hết giờ (return 0)
-                    // và code cũ lập tức gán break ngắt kết nối. File nặng chắc chắn sẽ rớt mạng nửa chừng!
-                    // Đã sửa thành: tv{0, 500000} (Nghỉ nửa giây để chờ cáp quang xả dữ liệu)
-                    struct timeval tv{0, 500000};
+                    struct timeval tv{0, 500000}; // Chờ tối đa 0.5 giây
                     int sel = select(fd + 1, nullptr, &wfds, nullptr, &tv);
 
                     if (sel < 0)
                         break; // Lỗi cấu trúc socket
                     if (sel == 0)
                     {
-                        // Kẹt mạng quá lâu (hết nửa giây mà vẫn đầy)
                         timeout_count++;
                         if (timeout_count > 60)
-                            break; // Kẹt liên tục 30 giây (60 * 0.5s) mới quyết định drop Client
+                            break; // Quá 30 giây kẹt liên tục mới ngắt kết nối
                         continue;
                     }
                     continue; // Ống thông thì quay lên gửi tiếp
                 }
-                break; // Lỗi đứt dây mạng thật sự (EPIPE, ECONNRESET...)
+                break; // Lỗi đứt kết nối (EPIPE, ECONNRESET...)
             }
         }
         close(file_fd);
