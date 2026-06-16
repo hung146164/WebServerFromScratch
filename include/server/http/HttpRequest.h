@@ -9,6 +9,7 @@
 #define CPPSERVER_HTTP_HTTPREQUEST_H
 
 #include <string_view>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -36,6 +37,7 @@ struct HttpRequest
     std::string_view current_header_key;
 
     std::vector<char> cache;
+    std::string client_ip;
 
     HttpRequest(int bufferSize = 65536);
 
