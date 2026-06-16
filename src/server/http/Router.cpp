@@ -1,18 +1,27 @@
-/*!
-    \file Router.cpp
-    \brief Router implementation with path-only matching and wildcard fallback
-    \author HungForre
-    \date 7/6/2026
-    \copyright VDT
-*/
-
 #include "server/http/Router.h"
+#include "server/http/HttpUtils.h"
 #include <sys/socket.h>
 #include <iostream>
 #include <sstream>
+#include <ctime>
+#include <unordered_map>
 
 std::unordered_map<std::string, HandlerFunc> Http::Router::routes;
 HandlerFunc Http::Router::fallback_handler = nullptr;
+int Http::Router::rate_limit_per_sec = 20;
+
+// Khai báo biến thread-local của worker ID (được định nghĩa trong Worker.cpp)
+extern thread_local int current_worker_id;
+
+// Cấu trúc phục vụ cho bộ giới hạn tần suất yêu cầu (Rate Limiting)
+struct RateLimitInfo
+{
+    int count = 0;
+    time_t window_start = 0;
+};
+
+// Lưu thông tin giới hạn truy cập của từng IP trên mỗi Thread Worker (Không cần khóa Mutex!)
+thread_local std::unordered_map<std::string, RateLimitInfo> ip_rate_limits;
 
 std::string Http::Router::MethodToString(HttpMethod method)
 {
@@ -59,6 +68,25 @@ void Http::Router::RegisterFallback(HandlerFunc handler)
 
 void Http::Router::Dispatch(int fd, const HttpRequest &req)
 {
+    // --- 1. Giới Hạn Tần Suất Yêu Cầu (Rate Limiting) ---
+    time_t now = time(nullptr);
+    auto &limit_info = ip_rate_limits[std::string(req.client_ip)];
+    if (now - limit_info.window_start >= 1)
+    {
+        limit_info.count = 1;
+        limit_info.window_start = now;
+    }
+    else
+    {
+        limit_info.count++;
+        if (limit_info.count > rate_limit_per_sec) // Giới hạn cấu hình động
+        {
+            SendErrorResponse(fd, 429, "Too Many Requests", "{\"error\":\"Rate limit exceeded. Max " + std::to_string(rate_limit_per_sec) + " req/sec.\"}");
+            Http::LogRequest(current_worker_id, req.client_ip, req, 429);
+            return;
+        }
+    }
+
     // Xu ly OPTIONS preflight CORS
     if (req.method == HttpMethod::OPTIONS)
     {
@@ -69,27 +97,50 @@ void Http::Router::Dispatch(int fd, const HttpRequest &req)
             "Access-Control-Allow-Headers: Content-Type, Authorization\r\n"
             "Content-Length: 0\r\n\r\n";
         send(fd, res.data(), res.size(), MSG_NOSIGNAL);
+        Http::LogRequest(current_worker_id, req.client_ip, req, 200);
         return;
     }
 
+    // --- 2. Giải Mã URL (Percent-Decoding) ---
     std::string path = ExtractPath(req.http_url);
+    path = Http::UrlDecode(path);
     std::string key = MethodToString(req.method) + ":" + path;
 
+    // 1. Khớp tuyệt đối trước (Exact Match)
     auto it = routes.find(key);
     if (it != routes.end())
     {
         it->second(fd, req);
+        Http::LogRequest(current_worker_id, req.client_ip, req, 200);
         return;
+    }
+
+    // 2. Khớp tiền tố (Wildcard / Prefix Match, ví dụ route path kết thúc bằng *)
+    for (const auto &pair : routes)
+    {
+        const std::string &route_key = pair.first;
+        if (!route_key.empty() && route_key.back() == '*')
+        {
+            std::string prefix = route_key.substr(0, route_key.size() - 1);
+            if (key.size() >= prefix.size() && key.compare(0, prefix.size(), prefix) == 0)
+            {
+                pair.second(fd, req);
+                Http::LogRequest(current_worker_id, req.client_ip, req, 200);
+                return;
+            }
+        }
     }
 
     if (fallback_handler)
     {
         fallback_handler(fd, req);
+        Http::LogRequest(current_worker_id, req.client_ip, req, 200);
         return;
     }
 
     // 404
     SendErrorResponse(fd, 404, "Not Found", "{\"error\":\"Route Not Found\"}");
+    Http::LogRequest(current_worker_id, req.client_ip, req, 404);
 }
 
 void Http::Router::SendErrorResponse(int fd, int status_code,
