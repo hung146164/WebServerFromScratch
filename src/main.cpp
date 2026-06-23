@@ -110,6 +110,7 @@ int main()
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
     std::signal(SIGHUP, signal_handler); // Reload config.json không downtime
+    std::signal(SIGPIPE, SIG_IGN);
 
     server.Start();
     return 0;

@@ -57,7 +57,6 @@ void HttpRequest::NextRequest(int new_tail)
     curr_idx = 0;
     start_idx = 0;
     tail_idx = new_tail;
-    client_ip.clear();
 }
 
 static inline int span(int from, int to) { return (int)(to - from); }
