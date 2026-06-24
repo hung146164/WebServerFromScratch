@@ -33,6 +33,15 @@ Worker::Worker(int worker_id_, ServerConfig config_)
 }
 void Worker::SetupNetwork()
 {
+    /*
+        -Tạo socket ipv4 và sock_stream(tcp), đặt socket ở chế độ ko chặn (nghĩa là nếu
+        chưa có gì thì hệ điều hành sẽ trả về mã EAGAIN hoặc EWOULDBLOCK bảo là chưa có gì mới đâu),
+        -cờ SOCK_CLOEXEC:
+        vấn đề: khi tiến trình con tạo, nó sẽ sao chép nguyên cái des từ cha sang con lúc này
+        con cũng trỏ vào socket, giả sử lúc này cha bị kill, Reference count giảm từ 2 xuống 1, vì RC =1
+        nên hdh sẽ không thu hỏi port này -> port sẽ bị chiếm dụng.
+        giải pháp: khi gắn cờ này nó sẽ tự động xóa ô socket trong FD của con đi.
+    */
     server_socket.SetSocketfd(socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0));
 
     if (server_socket.GetSocketfd() < 0)
@@ -41,6 +50,12 @@ void Worker::SetupNetwork()
         return;
     }
 
+    /*
+        -Cờ SO_REUSEPORT cho phép nhiều tiến trình bind vào một port, dùng hash để phân phối,
+        chỗ này mình sẽ tối ưu phân phối sau bằng ./p2c_balancer.c
+        -opt=1 là bật , 0 là tắt. (chả hiểu sao c++ yêu cầu truyền hẳn 2 tham số vào làm gì?:D )
+
+    */
     int opt = 1;
     if (setsockopt(server_socket.GetSocketfd(), SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0)
     {
@@ -48,6 +63,9 @@ void Worker::SetupNetwork()
         return;
     }
 
+    /*
+        chỗ này chỉ thiết lập cấu hình thôi
+    */
     sockaddr_in server_addr{};
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons((uint16_t)config.port);
@@ -66,6 +84,18 @@ void Worker::SetupNetwork()
         return;
     }
 
+    /*
+        Tạo epoll để quản lý sk mạng, cái này kiểu hdh sẽ gom lại những thẳng muốn phát biểu
+        rồi đưa tôi. ở đây có 2 chế độ là
+        Level-trigger(hệ điều hành sẽ gọi liên tục,cứ lúc
+        nào có biến),
+        -Edge-Triggered (lúc nào có biến tạo gọi m đúng 1 lần, do đó khi lấy dữ liệu
+        thì phải dùng while để đọc hết, và hàm read là cái hàm sẽ block bạn, cho nên bạn phải set
+        cho cái socket là Non block thì mới dùng đc)
+        -C++ dùng cái epoll_event, hay sockaddr để vừa gửi cũng như vừa đọc rất tiện
+
+    */
+
     epoll_socket.SetSocketfd(epoll_create1(0));
     if (epoll_socket.GetSocketfd() == -1)
     {
@@ -80,6 +110,14 @@ void Worker::SetupNetwork()
         std::cerr << "[Worker " << worker_id << "] Failed to add server socket to epoll\n";
     }
 
+    /*
+        Này Kernel, kiểm tra xem có những Socket nào vừa có dữ liệu mới
+        (hoặc có kết nối mới) thì chép tên (File Descriptor) và
+        sự kiện của tụi nó vào cái giỏ client_events này hộ tao.
+        Tao chuẩn bị sẵn cái giỏ có sức chứa tối đa là config.max_epoll_events chỗ ngồi rồi.
+
+        Cái này tùy cấu hình máy nếu server cpu thấp thì để thấp. thường 1024 cho 1GB ram
+    */
     client_events.resize((int)config.max_epoll_events);
 }
 void Worker::StartWorker()
@@ -89,6 +127,11 @@ void Worker::StartWorker()
 
     current_worker_id = worker_id;
 
+    /*
+        nếu ko phải hdh mac, vì os rất hay chuyển luồng
+        từ nhân này sang nhân khác vì nó tự muốn cân bằng tải, khi chuyển như thế cache L1/L2
+        lại phải nạp lại dữ liệu từ ram. cho nên ta khóa nhân đó trên luồng này tối ưu cache luôn.
+    */
 #ifndef __APPLE__
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
@@ -316,4 +359,10 @@ void Worker::HandleRequest(int fd)
         if (connection_closed)
             return;
     }
+}
+
+void Worker::UpdateConfig(ServerConfig config_)
+{
+    config.read_timeout_sec = config_.read_timeout_sec;
+    config.max_client_per_ip = config_.max_client_per_ip;
 }

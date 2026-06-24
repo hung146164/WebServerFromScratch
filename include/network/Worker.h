@@ -49,6 +49,7 @@ public:
 
     void StartWorker();
     void StopWorker();
+    void UpdateConfig(ServerConfig config_);
 };
 
 #endif

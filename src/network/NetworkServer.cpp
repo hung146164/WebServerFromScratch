@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <fstream>
 #include <sstream>
+#include <string_view>
 
 NetworkServer::NetworkServer(ServerConfig config_) : config(config_)
 {
@@ -76,6 +77,9 @@ void NetworkServer::ReloadConfig()
         Json::JsonParser parser(100);
         Json::JsonDocument doc = parser.Parse(content);
 
+        int old_port = config.port;
+        int old_workers = config.num_workers;
+
         if (doc["port"].GetNode())
             config.port = std::stoi(doc["port"].ToString());
         if (doc["num_workers"].GetNode())
@@ -92,13 +96,64 @@ void NetworkServer::ReloadConfig()
             config.read_timeout_sec = std::stoi(doc["read_timeout_sec"].ToString());
         if (doc["rate_limit_per_sec"].GetNode())
             Http::Router::rate_limit_per_sec = std::stoi(doc["rate_limit_per_sec"].ToString());
+        if (doc["enable_ebpf"].GetNode()->type == Json::JsonType::BOOL)
+        {
+            std::string_view ebpf_str = doc["enable_ebpf"].ToString();
 
-        std::cout << "[Config] Successfully loaded config.json using custom JsonParser:\n"
-                  << "         Port: " << config.port << "\n"
-                  << "         Workers: " << config.num_workers << "\n"
-                  << "         Read Timeout: " << config.read_timeout_sec << "s\n"
-                  << "         Max Client Per IP: " << config.max_client_per_ip << "\n"
-                  << "         Rate Limit: " << Http::Router::rate_limit_per_sec << " req/sec\n";
+            if (ebpf_str == "true")
+            {
+                config.enable_ebpf = true;
+            }
+            else if (ebpf_str == "false")
+            {
+                config.enable_ebpf = false;
+            }
+            else
+            {
+                throw std::runtime_error("Invalid boolean value for enable_ebpf");
+            }
+        }
+
+        for (auto &worker : worker_instances)
+        {
+            if (worker)
+            {
+                worker->UpdateConfig(config);
+            }
+        }
+
+        if (!is_running)
+        {
+            std::cout << "[Config] Successfully loaded initial config.json:\n"
+                      << "         Port: " << config.port << "\n"
+                      << "         Workers: " << config.num_workers << "\n"
+                      << "         Read Timeout: " << config.read_timeout_sec << "s\n"
+                      << "         Max Client Per IP: " << config.max_client_per_ip << "\n"
+                      << "         Rate Limit: " << Http::Router::rate_limit_per_sec << " req/sec\n";
+        }
+        else
+        {
+            std::cout << "[Config] Configuration hot-reloaded via SIGHUP:\n"
+                      << "         [DYNAMIC] Read Timeout: " << config.read_timeout_sec << "s (Applied)\n"
+                      << "         [DYNAMIC] Max Client Per IP: " << config.max_client_per_ip << " (Applied)\n"
+                      << "         [DYNAMIC] Rate Limit: " << Http::Router::rate_limit_per_sec << " req/sec (Applied)\n";
+
+            if (config.port != old_port || config.num_workers != old_workers)
+            {
+                std::cout << "         [WARNING] Static settings changed in config.json:\n";
+                if (config.port != old_port)
+                {
+                    std::cout << "                   - Port changed from " << old_port << " to " << config.port << "\n";
+                    config.port = old_port;
+                }
+                if (config.num_workers != old_workers)
+                {
+                    std::cout << "                   - Workers changed from " << old_workers << " to " << config.num_workers << "\n";
+                    config.num_workers = old_workers;
+                }
+                std::cout << "                   (These static changes require server restart to apply!)\n";
+            }
+        }
     }
     catch (...)
     {
