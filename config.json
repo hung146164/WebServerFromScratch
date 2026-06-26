@@ -3,11 +3,11 @@
   "_comment_dynamic": "CAU HINH DONG (Hot-reload tuc thi qua tin hieu SIGHUP): max_client_per_ip, read_timeout_sec, rate_limit_per_sec",
   "port": 8081,
   "num_workers": 2,
-  "client_per_worker": 100,
-  "max_epoll_events": 50,
-  "max_listen_queue": 50,
-  "max_client_per_ip": 10,
+  "client_per_worker": 1000,
+  "max_epoll_events": 1024,
+  "max_listen_queue": 2048,
+  "max_client_per_ip": 10000,
   "read_timeout_sec": 15,
-  "rate_limit_per_sec": 20,
-  "enable_ebpf": true
+  "rate_limit_per_sec": 1000000,
+  "enable_ebpf": false
 }
