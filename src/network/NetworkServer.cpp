@@ -109,7 +109,7 @@ void NetworkServer::ReloadConfig()
             Http::Router::rate_limit_per_sec = safe_parse(doc["rate_limit_per_sec"].ToString(), 20, 1, 1000000);
         if (doc["enable_ebpf"].GetNode()->type == Json::JsonType::BOOL)
         {
-            std::string_view ebpf_str = doc["enable_ebpf"].ToString();
+            std::string ebpf_str = doc["enable_ebpf"].ToString();
 
             if (ebpf_str == "true")
             {
