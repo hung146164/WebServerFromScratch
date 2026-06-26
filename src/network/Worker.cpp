@@ -232,6 +232,14 @@ void Worker::CloseConnection(int fd)
 {
     epoll_ctl(epoll_socket.GetSocketfd(), EPOLL_CTL_DEL, fd, nullptr);
 
+    // Set SO_LINGER with a timeout of 0 to force connection termination (RST)
+    // and discard any unsent/unacknowledged data in the send buffer immediately.
+    // This avoids keeping the memory allocated during background TCP retransmissions.
+    struct linger sl;
+    sl.l_onoff = 1;
+    sl.l_linger = 0;
+    setsockopt(fd, SOL_SOCKET, SO_LINGER, &sl, sizeof(sl));
+
     shutdown(fd, SHUT_WR);
     char buf[128];
     while (recv(fd, buf, sizeof(buf), 0) > 0)
