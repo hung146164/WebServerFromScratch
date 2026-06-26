@@ -18,6 +18,7 @@
 #include <iostream>
 
 #include "server/http/HttpResponse.h"
+#include "server/http/HttpUtils.h"
 
 namespace Http
 {
@@ -69,7 +70,8 @@ namespace Http
 
     inline void ServeFile(int fd, const HttpRequest &req, std::string_view web_root, std::string_view req_range = "")
     {
-        std::string_view url_path = req.http_url;
+        std::string decoded_url = Http::UrlDecode(req.http_url);
+        std::string_view url_path = decoded_url;
         bool force_download = false;
         auto qpos = url_path.find('?');
         if (qpos != std::string_view::npos)
@@ -99,6 +101,10 @@ namespace Http
 
         std::string file_str = canonical_file.string();
         std::string root_str = canonical_root.string();
+        if (!root_str.empty() && root_str.back() != '/' && root_str.back() != '\\')
+        {
+            root_str += '/';
+        }
 
         // 5. Kiểm tra bảo mật
         if (file_str.size() < root_str.size() || file_str.substr(0, root_str.size()) != root_str)
@@ -217,48 +223,14 @@ namespace Http
         header += "Access-Control-Allow-Origin: *\r\nConnection: keep-alive\r\n\r\n";
         send(fd, header.data(), header.size(), MSG_NOSIGNAL);
 
-        // 9. Vòng lặp bơm dữ liệu Zero-Copy
-        ssize_t remaining = (ssize_t)send_size;
-        int timeout_count = 0; // Đếm số lần bị nghẽn mạng liên tiếp
-
-        while (remaining > 0)
-        {
-            ssize_t sent = sendfile(fd, file_fd, &offset, (size_t)remaining);
-            if (sent > 0)
-            {
-                remaining -= sent;
-                timeout_count = 0; // Gửi thành công thì xóa đếm nghẽn mạng
-            }
-            else if (sent == 0)
-            {
-                break; // Client chủ động đóng kết nối
-            }
-            else // sent < 0
-            {
-                if (errno == EAGAIN || errno == EWOULDBLOCK)
-                {
-                    fd_set wfds;
-                    FD_ZERO(&wfds);
-                    FD_SET(fd, &wfds);
-
-                    struct timeval tv{0, 500000}; // Chờ tối đa 0.5 giây
-                    int sel = select(fd + 1, nullptr, &wfds, nullptr, &tv);
-
-                    if (sel < 0)
-                        break; // Lỗi cấu trúc socket
-                    if (sel == 0)
-                    {
-                        timeout_count++;
-                        if (timeout_count > 60)
-                            break; // Quá 30 giây kẹt liên tục mới ngắt kết nối
-                        continue;
-                    }
-                    continue; // Ống thông thì quay lên gửi tiếp
-                }
-                break; // Lỗi đứt kết nối (EPIPE, ECONNRESET...)
-            }
-        }
-        close(file_fd);
+        // Thiết lập trạng thái gửi file ngầm, không tự gửi đồng bộ nữa
+        HttpRequest* mutable_req = const_cast<HttpRequest*>(&req);
+        mutable_req->is_sending_file = true;
+        mutable_req->file_fd = file_fd;
+        mutable_req->file_offset = offset;
+        mutable_req->file_remaining = send_size;
+        mutable_req->last_speed_check_time = time(nullptr);
+        mutable_req->bytes_sent_in_period = 0;
     }
 
 } // namespace Http

@@ -205,6 +205,29 @@ namespace Http
             filename = filename.substr(last_slash + 1);
         }
 
+        // Validate file extension matches what the server supports
+        auto IsSupportedExtension = [](std::string_view fn) -> bool {
+            auto pos = fn.rfind('.');
+            if (pos == std::string_view::npos)
+                return false;
+            std::string ext;
+            for (size_t i = pos; i < fn.size(); ++i)
+            {
+                ext += (char)std::tolower((unsigned char)fn[i]);
+            }
+            return (ext == ".html" || ext == ".htm" || ext == ".css" || ext == ".js" ||
+                    ext == ".json" || ext == ".xml" || ext == ".txt" || ext == ".png" ||
+                    ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".svg" ||
+                    ext == ".ico" || ext == ".webp" || ext == ".woff" || ext == ".woff2" ||
+                    ext == ".ttf" || ext == ".pdf" || ext == ".zip");
+        };
+
+        if (!IsSupportedExtension(filename))
+        {
+            Http::JSON(fd, 400, "{\"error\":\"File format not supported. Only web assets (.html, .css, .js, .png, .pdf, .zip, etc.) are allowed.\"}");
+            return;
+        }
+
         std::string full_path = upload_dir + "/" + filename;
         std::ofstream out(full_path, std::ios::binary);
         if (!out.is_open())

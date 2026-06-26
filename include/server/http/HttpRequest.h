@@ -44,6 +44,16 @@ struct HttpRequest
     // Chạy vòng lặp phân tích cú pháp
     const HttpParserState *Parse();
 
+    // State for asynchronous file sending (EPOLLOUT)
+    bool is_sending_file = false;
+    int file_fd = -1;
+    off_t file_offset = 0;
+    off_t file_remaining = 0;
+
+    // Minimum data rate speed monitoring
+    time_t last_speed_check_time = 0;
+    off_t bytes_sent_in_period = 0;
+
     void Reset();
     void NextRequest(int new_tail);
 };

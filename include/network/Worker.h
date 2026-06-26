@@ -43,9 +43,11 @@ private:
     void HandleRequest(int fd);
     void CloseConnection(int fd);
     void ProcessHttpRequest(int fd, HttpRequest *request);
+    void ContinueSendFile(int fd, HttpRequest *req);
 
 public:
     Worker(int worker_id_, ServerConfig config_);
+    int GetEpollFd() const { return epoll_socket.GetSocketfd(); }
 
     void StartWorker();
     void StopWorker();

@@ -1,4 +1,8 @@
 #include "network/NetworkServer.h"
+#include "common/Json/JsonParser.h"
+#include "common/Json/JsonDocument.h"
+#include "common/Json/JsonNode.h"
+#include <chrono>
 #include "network/ServerConfig.h"
 #include "server/http/Router.h"
 #include "server/http/HttpResponse.h"
@@ -85,6 +89,112 @@ void secure_data_handler(int fd, const HttpRequest &req)
     send(fd, response.data(), response.size(), MSG_NOSIGNAL);
 }
 
+// Handler minh họa phân tích cú pháp và xử lý JSON (Thread-Local Arena Parser Demo)
+void parse_students_handler(int fd, const HttpRequest &req)
+{
+    // Cấp phát trước 1,000 nodes trên mỗi luồng (Size Guard chống DoS)
+    thread_local Json::JsonParser parser(1000);
+
+    try
+    {
+        auto start = std::chrono::high_resolution_clock::now();
+
+        Json::JsonDocument doc = parser.Parse(req.body);
+
+        Json::JsonNode *root = doc.GetNode();
+        if (!root || root->type != Json::JsonType::ARRAY)
+        {
+            Http::JSON(fd, 400, "{\"error\":\"Invalid JSON. Expected an array of student objects.\"}");
+            return;
+        }
+
+        int total_students = 0;
+        double sum_gpa = 0.0;
+        double max_gpa = -1.0;
+        std::string top_student = "";
+
+        Json::JsonNode *curr = root->child;
+        while (curr != nullptr)
+        {
+            if (curr->type == Json::JsonType::OBJECT)
+            {
+                std::string name = "";
+                int age = 0;
+                double gpa = 0.0;
+
+                Json::JsonNode *prop = curr->child;
+                while (prop != nullptr)
+                {
+                    if (prop->key == "name" && prop->type == Json::JsonType::STRING)
+                    {
+                        name = std::string(prop->value);
+                    }
+                    else if (prop->key == "age" && prop->type == Json::JsonType::NUMBER)
+                    {
+                        age = std::stoi(std::string(prop->value));
+                    }
+                    else if (prop->key == "gpa" && prop->type == Json::JsonType::NUMBER)
+                    {
+                        gpa = std::stod(std::string(prop->value));
+                    }
+                    prop = prop->next;
+                }
+
+                if (!name.empty() && age > 0)
+                {
+                    total_students++;
+                    sum_gpa += gpa;
+                    if (gpa > max_gpa)
+                    {
+                        max_gpa = gpa;
+                        top_student = name;
+                    }
+                }
+            }
+            curr = curr->next;
+        }
+
+        auto end = std::chrono::high_resolution_clock::now();
+        double elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+        if (total_students == 0)
+        {
+            Http::JSON(fd, 400, "{\"error\":\"No valid student records found.\"}");
+            return;
+        }
+
+        double avg_gpa = sum_gpa / total_students;
+
+        std::string resp = "{"
+                           "\"status\":\"success\","
+                           "\"total_students\":" +
+                           std::to_string(total_students) + ","
+                                                            "\"average_gpa\":" +
+                           std::to_string(avg_gpa) + ","
+                                                     "\"top_student\":\"" +
+                           top_student + "\","
+                                         "\"max_gpa\":" +
+                           std::to_string(max_gpa) + ","
+                                                     "\"parsing_time_us\":" +
+                           std::to_string(elapsed_us) + ","
+                                                        "\"node_limit\":10000"
+                                                        "}";
+        Http::JSON(fd, 200, resp);
+    }
+    catch (const std::exception &e)
+    {
+        std::string err_msg = e.what();
+        if (err_msg.find("Memory pool exhausted") != std::string::npos)
+        {
+            Http::JSON(fd, 413, "{\"error\":\"Payload Too Large: JSON structure exceeds the 10000 node pool security limit!\"}");
+        }
+        else
+        {
+            Http::JSON(fd, 400, "{\"error\":\"Bad Request: JSON parsing error or malformed structure.\"}");
+        }
+    }
+}
+
 int main()
 {
     ServerConfig cfg;
@@ -99,6 +209,9 @@ int main()
 
     // Đăng ký Route POST dữ liệu bảo mật (Mã hóa RC4)
     Http::Router::Register(HttpMethod::POST, "/api/secure_data", secure_data_handler);
+
+    // Đăng ký Route POST xử lý danh sách học sinh (JSON Parser demo)
+    Http::Router::Register(HttpMethod::POST, "/api/parse_students", parse_students_handler);
 
     // Phục vụ mọi file tĩnh khác qua Fallback tự động
     Http::Router::RegisterFallback(fallback_test);

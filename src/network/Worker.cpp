@@ -8,6 +8,7 @@
 #include "network/Worker.h"
 #include "server/http/HttpParserState.h"
 #include "server/http/HttpResponse.h"
+#include <sys/sendfile.h>
 
 #include <iostream>
 #include <sstream>
@@ -143,6 +144,7 @@ void Worker::StartWorker()
               << (worker_id % std::thread::hardware_concurrency()) << "\n";
     is_running = true;
 
+    time_t last_timeout_check = 0;
     while (is_running)
     {
         int cnt = epoll_wait(epoll_socket.GetSocketfd(),
@@ -156,10 +158,49 @@ void Worker::StartWorker()
             std::cerr << "[Worker " << worker_id << "] epoll_wait error\n";
             break;
         }
-        if (cnt == 0)
-        {
 
-            time_t now = time(nullptr);
+        time_t now = time(nullptr);
+        if (cnt > 0)
+        {
+            for (int i = 0; i < cnt; ++i)
+            {
+                int fd = client_events[i].data.fd;
+                uint32_t events = client_events[i].events;
+
+                if (events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR))
+                {
+                    CloseConnection(fd);
+                    continue;
+                }
+
+                if (fd == server_socket.GetSocketfd())
+                {
+                    AcceptClient();
+                }
+                else
+                {
+                    if (events & EPOLLOUT)
+                    {
+                        HttpRequest* req = lru.GetWithoutMove(fd);
+                        if (req && req->is_sending_file)
+                        {
+                            ContinueSendFile(fd, req);
+                            continue;
+                        }
+                    }
+
+                    if (events & EPOLLIN)
+                    {
+                        HandleRequest(fd);
+                    }
+                }
+            }
+        }
+
+        // Run periodic idle connection cleanup (every 1s)
+        if (now - last_timeout_check >= 1)
+        {
+            last_timeout_check = now;
             while (true)
             {
                 int oldest_fd = lru.OldestKey();
@@ -177,31 +218,9 @@ void Worker::StartWorker()
                     break;
                 }
             }
-            continue;
-        }
-
-        for (int i = 0; i < cnt; ++i)
-        {
-            int fd = client_events[i].data.fd;
-
-            if (client_events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR))
-            {
-                CloseConnection(fd);
-
-                continue;
-            }
-
-            if (fd == server_socket.GetSocketfd())
-            {
-                AcceptClient();
-            }
-            else
-            {
-                HandleRequest(fd);
-            }
         }
     }
-    std::cout << "[Worker " << worker_id << "] Event Loop stopped.\n";
+        std::cout << "[Worker " << worker_id << "] Event Loop stopped.\n";
 }
 
 void Worker::StopWorker()
@@ -294,14 +313,15 @@ void Worker::HandleRequest(int fd)
 
     while (true)
     {
+        if (request->is_sending_file)
+            break;
+
         int space = capacity - request->tail_idx;
         if (space <= 0)
         {
             std::string error_msg = "Payload Too Large";
             Http::Error(fd, 413, error_msg);
-
             CloseConnection(fd);
-
             return;
         }
 
@@ -334,6 +354,28 @@ void Worker::HandleRequest(int fd)
             {
                 ProcessHttpRequest(fd, request);
 
+                if (request->is_sending_file)
+                {
+                    epoll_event ev{};
+                    ev.events = EPOLLOUT | EPOLLET | EPOLLRDHUP;
+                    ev.data.fd = fd;
+                    epoll_ctl(epoll_socket.GetSocketfd(), EPOLL_CTL_MOD, fd, &ev);
+
+                    int remain = request->tail_idx - request->curr_idx;
+                    if (remain > 0)
+                        std::memmove(&request->cache[0],
+                                     &request->cache[request->curr_idx],
+                                     (int)remain);
+                    request->NextRequest(remain);
+                    lru.MakeRecent(fd);
+                    
+                    // Call ContinueSendFile immediately to start the write process
+                    ContinueSendFile(fd, request);
+
+                    connection_closed = true;
+                    break;
+                }
+
                 int remain = request->tail_idx - request->curr_idx;
                 if (remain > 0)
                     std::memmove(&request->cache[0],
@@ -352,7 +394,6 @@ void Worker::HandleRequest(int fd)
                 break;
             }
             else
-
                 break;
         }
 
@@ -365,4 +406,65 @@ void Worker::UpdateConfig(ServerConfig config_)
 {
     config.read_timeout_sec = config_.read_timeout_sec;
     config.max_client_per_ip = config_.max_client_per_ip;
+}
+
+void Worker::ContinueSendFile(int fd, HttpRequest* req)
+{
+    time_t now = time(nullptr);
+
+    while (req->file_remaining > 0)
+    {
+        ssize_t sent = sendfile(fd, req->file_fd, &req->file_offset, (size_t)req->file_remaining);
+
+        if (sent > 0)
+        {
+            req->file_remaining -= sent;
+            req->bytes_sent_in_period += sent;
+            lru.MakeRecent(fd);
+        }
+        else if (sent < 0)
+        {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                break;
+            }
+            CloseConnection(fd);
+            return;
+        }
+        else
+        {
+            CloseConnection(fd);
+            return;
+        }
+    }
+
+    time_t elapsed = now - req->last_speed_check_time;
+    std::cout << "[DEBUG] ContinueSendFile fd: " << fd << ", elapsed: " << elapsed 
+              << ", bytes_sent: " << req->bytes_sent_in_period << ", remaining: " << req->file_remaining << "\n";
+    if (elapsed >= 5)
+    {
+        double speed = (double)req->bytes_sent_in_period / elapsed;
+        std::cout << "[DEBUG] Speed check fd: " << fd << ", speed: " << (speed / 1024.0) << " KB/s\n";
+        if (speed < 5120.0)
+        {
+            std::cout << "[Slow Connection] Kicking client fd " << fd 
+                      << " due to low speed: " << (speed / 1024.0) << " KB/s\n";
+            CloseConnection(fd);
+            return;
+        }
+        req->last_speed_check_time = now;
+        req->bytes_sent_in_period = 0;
+    }
+
+    if (req->file_remaining == 0)
+    {
+        close(req->file_fd);
+        req->file_fd = -1;
+        req->is_sending_file = false;
+
+        epoll_event ev{};
+        ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
+        ev.data.fd = fd;
+        epoll_ctl(epoll_socket.GetSocketfd(), EPOLL_CTL_MOD, fd, &ev);
+    }
 }

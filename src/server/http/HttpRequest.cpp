@@ -6,6 +6,7 @@
     \copyright VDT
 */
 #include "server/http/HttpRequest.h"
+#include <unistd.h>
 #include "server/http/HttpParserState.h"
 #include <cctype>
 #include <algorithm>
@@ -43,6 +44,15 @@ void HttpRequest::Reset()
     start_idx = 0;
     curr_idx = 0;
     client_ip.clear();
+    if (file_fd != -1) {
+        close(file_fd);
+        file_fd = -1;
+    }
+    is_sending_file = false;
+    file_offset = 0;
+    file_remaining = 0;
+    last_speed_check_time = 0;
+    bytes_sent_in_period = 0;
 }
 
 void HttpRequest::NextRequest(int new_tail)

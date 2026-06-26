@@ -80,22 +80,33 @@ void NetworkServer::ReloadConfig()
         int old_port = config.port;
         int old_workers = config.num_workers;
 
+        auto safe_parse = [](std::string_view str, int default_val, int min_val, int max_val) -> int {
+            try {
+                long long val = std::stoll(std::string(str));
+                if (val < min_val) return min_val;
+                if (val > max_val) return max_val;
+                return (int)val;
+            } catch (...) {
+                return default_val;
+            }
+        };
+
         if (doc["port"].GetNode())
-            config.port = std::stoi(doc["port"].ToString());
+            config.port = (uint16_t)safe_parse(doc["port"].ToString(), 8081, 1, 65535);
         if (doc["num_workers"].GetNode())
-            config.num_workers = std::stoi(doc["num_workers"].ToString());
+            config.num_workers = safe_parse(doc["num_workers"].ToString(), std::thread::hardware_concurrency(), 1, 64);
         if (doc["client_per_worker"].GetNode())
-            config.client_per_worker = std::stoi(doc["client_per_worker"].ToString());
+            config.client_per_worker = safe_parse(doc["client_per_worker"].ToString(), 100, 1, 100000);
         if (doc["max_epoll_events"].GetNode())
-            config.max_epoll_events = std::stoi(doc["max_epoll_events"].ToString());
+            config.max_epoll_events = safe_parse(doc["max_epoll_events"].ToString(), 50, 1, 10000);
         if (doc["max_listen_queue"].GetNode())
-            config.max_listen_queue = std::stoi(doc["max_listen_queue"].ToString());
+            config.max_listen_queue = safe_parse(doc["max_listen_queue"].ToString(), 50, 1, 10000);
         if (doc["max_client_per_ip"].GetNode())
-            config.max_client_per_ip = std::stoi(doc["max_client_per_ip"].ToString());
+            config.max_client_per_ip = safe_parse(doc["max_client_per_ip"].ToString(), 10, 1, 10000);
         if (doc["read_timeout_sec"].GetNode())
-            config.read_timeout_sec = std::stoi(doc["read_timeout_sec"].ToString());
+            config.read_timeout_sec = safe_parse(doc["read_timeout_sec"].ToString(), 15, 1, 3600);
         if (doc["rate_limit_per_sec"].GetNode())
-            Http::Router::rate_limit_per_sec = std::stoi(doc["rate_limit_per_sec"].ToString());
+            Http::Router::rate_limit_per_sec = safe_parse(doc["rate_limit_per_sec"].ToString(), 20, 1, 1000000);
         if (doc["enable_ebpf"].GetNode()->type == Json::JsonType::BOOL)
         {
             std::string_view ebpf_str = doc["enable_ebpf"].ToString();
