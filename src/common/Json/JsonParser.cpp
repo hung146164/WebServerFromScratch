@@ -7,6 +7,7 @@
 */
 #include <string_view>
 #include <vector>
+#include <vector>
 #include <stdexcept>
 
 #include "common/Json/JsonParser.h"
@@ -24,7 +25,7 @@ namespace Json
             CleanNode(&node_pool[current_node_idx]);
             return &node_pool[current_node_idx++];
         }
-        return nullptr;
+        throw std::runtime_error("JsonParser: Memory pool exhausted.");
     }
 
     void JsonParser::CleanNode(JsonNode *node)
