@@ -228,7 +228,8 @@ namespace Http
             return;
         }
 
-        std::string full_path = upload_dir + "/" + filename;
+        std::string unique_filename = std::to_string(std::time(nullptr)) + "_" + std::to_string(fd) + "_" + filename;
+        std::string full_path = upload_dir + "/" + unique_filename;
         std::ofstream out(full_path, std::ios::binary);
         if (!out.is_open())
         {
@@ -239,7 +240,7 @@ namespace Http
         out.write(file_data.data(), file_data.size());
         out.close();
 
-        std::string resp_json = "{\"message\":\"File uploaded successfully\",\"filename\":\"" + filename + "\",\"size\":" + std::to_string(file_data.size()) + "}";
+        std::string resp_json = "{\"message\":\"File uploaded successfully\",\"filename\":\"" + unique_filename + "\",\"size\":" + std::to_string(file_data.size()) + "}";
         Http::JSON(fd, 201, resp_json);
     }
 
@@ -304,7 +305,8 @@ namespace Http
     {
         time_t now = time(nullptr);
         char time_str[64];
-        struct tm *tm_info = std::localtime(&now);
+        struct tm tm_res;
+        struct tm *tm_info = localtime_r(&now, &tm_res);
         if (tm_info)
         {
             std::strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
@@ -341,9 +343,13 @@ namespace Http
             break;
         }
 
-        std::cout << "[INFO] [" << time_str << "] [Worker " << worker_id << "] "
-                  << method_str << " " << req.http_url << " -> "
-                  << status_code << " " << status_msg << " (IP: " << client_ip << ")\n";
+        // Construct the log line as a single string to print atomically to std::cout,
+        // avoiding interleaved logs from concurrent worker threads.
+        std::string log_line = "[INFO] [" + std::string(time_str) + "] [Worker " + std::to_string(worker_id) + "] "
+                               + method_str + " " + std::string(req.http_url) + " -> "
+                               + std::to_string(status_code) + " " + status_msg 
+                               + " (IP: " + std::string(client_ip) + ")\n";
+        std::cout << log_line;
     }
 
 } // namespace Http
