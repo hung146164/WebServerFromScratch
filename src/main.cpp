@@ -38,17 +38,23 @@ void signal_handler(int signal)
 
 void test_download_image(int fd, const HttpRequest &request)
 {
-    for (auto &i : request.header)
+    HttpRequest req_copy = request;
+    if (req_copy.http_url.rfind("/api/download_image", 0) == 0)
     {
-        std::cout << i.first << ' ' << i.second << '\n';
+        req_copy.http_url.remove_prefix(19);
     }
+    if (req_copy.http_url.empty())
+    {
+        req_copy.http_url = "/";
+    }
+
     std::string_view req_range = "";
-    auto it = request.header.find("Range");
-    if (it != request.header.end())
+    auto it = req_copy.header.find("Range");
+    if (it != req_copy.header.end())
     {
         req_range = it->second;
     }
-    Http::ServeFile(fd, request, "www", req_range);
+    Http::ServeFile(fd, req_copy, "www", req_range);
 }
 
 void fallback_test(int fd, const HttpRequest &request)
