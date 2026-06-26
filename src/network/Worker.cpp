@@ -247,6 +247,18 @@ void Worker::CloseConnection(int fd)
     }
 
     close(fd);
+
+    // Decrement connection count for this IP
+    HttpRequest *req = lru.GetWithoutMove(fd);
+    if (req && !req->client_ip.empty())
+    {
+        ip_connections[req->client_ip]--;
+        if (ip_connections[req->client_ip] <= 0)
+        {
+            ip_connections.erase(req->client_ip);
+        }
+    }
+
     lru.Remove(fd);
 }
 
@@ -273,6 +285,27 @@ void Worker::AcceptClient()
             break;
         }
 
+        // Get client IP address
+        char ip_str[INET_ADDRSTRLEN];
+        std::string client_ip = "0.0.0.0";
+        if (inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN))
+        {
+            client_ip = ip_str;
+        }
+
+        // Enforce max connection per IP limit
+        if (ip_connections[client_ip] >= config.max_client_per_ip)
+        {
+            std::string limit_msg = "[IP Limit] Rejecting client from " + client_ip 
+                                   + " on Worker " + std::to_string(worker_id) 
+                                   + " (Limit " + std::to_string(config.max_client_per_ip) + " reached)\n";
+            std::cout << limit_msg;
+            close(client_fd);
+            continue;
+        }
+
+        ip_connections[client_ip]++;
+
         if (lru.Full())
         {
             int old_fd = lru.OldestKey();
@@ -290,6 +323,7 @@ void Worker::AcceptClient()
         {
             std::cerr << "[Worker " << worker_id << "] epoll_ctl ADD failed\n";
             close(client_fd);
+            ip_connections[client_ip]--;
             continue;
         }
 
@@ -297,11 +331,7 @@ void Worker::AcceptClient()
         HttpRequest *req = lru.GetWithoutMove(client_fd);
         if (req)
         {
-            char ip_str[INET_ADDRSTRLEN];
-            if (inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN))
-            {
-                req->client_ip = ip_str;
-            }
+            req->client_ip = client_ip;
         }
     }
 }

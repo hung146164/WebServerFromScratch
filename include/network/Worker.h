@@ -13,6 +13,7 @@
 #include <atomic>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <sys/epoll.h>
 
 #include "common/LRUCustom.h"
@@ -33,6 +34,7 @@ private:
     std::vector<epoll_event> client_events;
 
     LRUCustom<HttpRequest> lru;
+    std::unordered_map<std::string, int> ip_connections;
 
     std::atomic<bool> is_running{true};
 
