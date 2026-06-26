@@ -43,66 +43,9 @@
         <a href="test_benchmark.html" class="btn btn-primary">Chạy Benchmark</a>
       </div>
     </div>
-
-    <!-- Architecture & Config Board -->
-    <div class="grid" style="grid-template-columns: 1fr 1fr;">
-      <div class="card">
-        <h2>Kiến trúc Hệ thống (Multi-Reactor)</h2>
-        <p style="margin-bottom: 1rem;">WebServerVdt sử dụng mô hình sự kiện phi tuần tự thay thế hoàn toàn cho mô hình Thread-per-connection cổ điển:</p>
-        <ul style="list-style-position: inside; color: var(--text-secondary); font-size: 0.9rem; display: flex; flex-direction: column; gap: 0.5rem;">
-          <li><strong>Kernel Load-balancing</strong>: Dùng <code>SO_REUSEPORT</code> phân chia IP băm xuống các Worker.</li>
-          <li><strong>Thread Pinning</strong>: Khóa cứng luồng Worker vào nhân CPU (Core 0, Core 1...) tăng hit cache L1/L2.</li>
-          <li><strong>Epoll Loop</strong>: Sự kiện không chặn, mỗi Worker xử lý hàng vạn kết nối đồng thời.</li>
-          <li><strong>Zero-copy Sendfile</strong>: Phục vụ file từ Kernel space không qua User space RAM.</li>
-        </ul>
-      </div>
-
-      <div class="card">
-        <h2>Cấu hình Server hiện tại</h2>
-        <p style="margin-bottom: 1rem;">Các tham số động đang được nạp từ file <code>config.json</code> ở máy chủ:</p>
-        <div style="background: rgba(0,0,0,0.2); border-radius: 10px; padding: 1rem; font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent-cyan);">
-          <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
-            <span>Port:</span><span id="cfg-port">8081</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
-            <span>Worker Threads:</span><span id="cfg-workers">2</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
-            <span>Max Epoll Events:</span><span id="cfg-events">50</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
-            <span>Read Timeout (Timeout):</span><span id="cfg-timeout">15s</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
-            <span>Max Limit per IP:</span><span id="cfg-limit">10 conn</span>
-          </div>
-          <div style="display:flex; justify-content:space-between;">
-            <span>Rate Limit per IP:</span><span id="cfg-rate-limit">10000 req/s</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <footer>
       <p>© 2026 WebServerVdt. Dự án Lập trình Hệ thống nâng cao - Viettel Digital Talent.</p>
     </footer>
   </div>
-
-  <script>
-    // Tải cấu hình từ config.json
-    fetch('config.json')
-      .then(res => res.json())
-      .then(data => {
-        document.getElementById('cfg-port').textContent = data.port || '8081';
-        document.getElementById('cfg-workers').textContent = data.num_workers || '2';
-        document.getElementById('cfg-events').textContent = data.max_epoll_events || '50';
-        document.getElementById('cfg-timeout').textContent = (data.read_timeout_sec || '15') + 's';
-        document.getElementById('cfg-limit').textContent = (data.max_client_per_ip || '10') + ' conn';
-        document.getElementById('cfg-rate-limit').textContent = (data.rate_limit_per_sec || '20') + ' req/s';
-      })
-      .catch(err => {
-        console.warn('Không load được config.json động, sử dụng hiển thị mặc định.', err);
-      });
-  </script>
 </body>
 </html>

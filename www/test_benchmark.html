@@ -303,6 +303,10 @@
             // Xử lý đọc stream từng chunk để đo băng thông mà không lưu trữ trong RAM tránh tràn bộ nhớ trình duyệt
             const reader = res.body.getReader();
             while (true) {
+              if (stopSignal || (performance.now() - startTime >= testDurationMs)) {
+                await reader.cancel();
+                break;
+              }
               const { done, value } = await reader.read();
               if (done) break;
               if (value) {
