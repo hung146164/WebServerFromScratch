@@ -74,19 +74,25 @@ void NetworkServer::ReloadConfig()
 
     try
     {
-        Json::JsonParser parser(100);
+        Json::JsonParser parser(1000);
         Json::JsonDocument doc = parser.Parse(content);
 
         int old_port = config.port;
         int old_workers = config.num_workers;
 
-        auto safe_parse = [](std::string_view str, int default_val, int min_val, int max_val) -> int {
-            try {
+        auto safe_parse = [](std::string_view str, int default_val, int min_val, int max_val) -> int
+        {
+            try
+            {
                 long long val = std::stoll(std::string(str));
-                if (val < min_val) return min_val;
-                if (val > max_val) return max_val;
+                if (val < min_val)
+                    return min_val;
+                if (val > max_val)
+                    return max_val;
                 return (int)val;
-            } catch (...) {
+            }
+            catch (...)
+            {
                 return default_val;
             }
         };
