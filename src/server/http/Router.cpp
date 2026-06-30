@@ -20,7 +20,9 @@ struct RateLimitInfo
     time_t window_start = 0;
 };
 
-// Lưu thông tin giới hạn truy cập của từng IP trên mỗi Thread Worker (Không cần khóa Mutex!)
+/*
+    mỗi luồng sẽ có một cái để phục vụ, ko global tránh mutex
+*/
 thread_local std::unordered_map<std::string, RateLimitInfo> ip_rate_limits;
 
 std::string Http::Router::MethodToString(HttpMethod method)
@@ -44,15 +46,6 @@ std::string Http::Router::MethodToString(HttpMethod method)
     }
 }
 
-// Tach path ra khoi URL (bo query string ?key=val)
-static std::string ExtractPath(std::string_view url)
-{
-    auto qpos = url.find('?');
-    if (qpos != std::string_view::npos)
-        return std::string(url.substr(0, qpos));
-    return std::string(url);
-}
-
 void Http::Router::Register(HttpMethod method, const std::string &path, HandlerFunc handler)
 {
     std::string key = MethodToString(method) + ":" + path;
@@ -68,9 +61,17 @@ void Http::Router::RegisterFallback(HandlerFunc handler)
 
 void Http::Router::Dispatch(int fd, const HttpRequest &req)
 {
-    // --- 1. Giới Hạn Tần Suất Yêu Cầu (Rate Limiting) ---
+    /*
+        Kiểm tra tần xuất yêu cầu
+        // Giới hạn mỗi giây 1 socket chỉ có thể gửi
+        tối đa rate_limit_per_sec request
+    */
     time_t now = time(nullptr);
     auto &limit_info = ip_rate_limits[std::string(req.client_ip)];
+
+    /*
+        nếu thời gian >=1s thì reset lại biến đếm
+    */
     if (now - limit_info.window_start >= 1)
     {
         limit_info.count = 1;
@@ -78,8 +79,9 @@ void Http::Router::Dispatch(int fd, const HttpRequest &req)
     }
     else
     {
+        // Kiểm tra nếu request vượt quá mức cho phép sẽ fail khi gửi tránh DOSS
         limit_info.count++;
-        if (limit_info.count > rate_limit_per_sec) // Giới hạn cấu hình động
+        if (limit_info.count > rate_limit_per_sec)
         {
             SendErrorResponse(fd, 429, "Too Many Requests", "{\"error\":\"Rate limit exceeded. Max " + std::to_string(rate_limit_per_sec) + " req/sec.\"}");
             Http::LogRequest(current_worker_id, req.client_ip, req, 429);
@@ -88,25 +90,52 @@ void Http::Router::Dispatch(int fd, const HttpRequest &req)
     }
 
     // Xu ly OPTIONS preflight CORS
+
+    /*
+        Tại sao cần cái này?
+        Vì trình duyệt chrome hay edge hay bất cứ trình duyệt nào đều có
+        cơ chế bảo mật gọi là Same-Origin Policy,
+        nghĩa là mặc định chặn JavaScript từ domain A gọi API đến domain B.
+
+        cho nên: Trước khi gửi request thật (GET/POST),
+        trình duyệt tự động gửi 1 request thăm dò trước bằng method OPTIONS
+
+        ví dụ :
+        OPTIONS /api/upload HTTP/1.1
+        Origin: http://forredev.me
+        Access-Control-Request-Method: POST
+        Access-Control-Request-Headers: Content-Type
+
+        Ý nghĩa: "Này server, tao sắp gửi POST với Content-Type, mày có cho phép không?"
+        Nếu server không trả lời hoặc trả lời sai,
+        trình duyệt hủy request thật luôn, không gửi nữa
+    */
     if (req.method == HttpMethod::OPTIONS)
     {
         std::string res =
             "HTTP/1.1 200 OK\r\n"
-            "Access-Control-Allow-Origin: *\r\n"
-            "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n"
-            "Access-Control-Allow-Headers: Content-Type, Authorization\r\n"
+            "Access-Control-Allow-Origin: *\r\n"                                // Cho phép mọi origin
+            "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n" // Các method được phép
+            "Access-Control-Allow-Headers: Content-Type, Authorization\r\n"     // Các header được phép
             "Content-Length: 0\r\n\r\n";
         send(fd, res.data(), res.size(), MSG_NOSIGNAL);
         Http::LogRequest(current_worker_id, req.client_ip, req, 200);
         return;
     }
 
-    // --- 2. Giải Mã URL (Percent-Decoding) ---
-    std::string path = ExtractPath(req.http_url);
-    path = Http::UrlDecode(path);
+    /*
+        Giải mã Url trình duyệt/client tự động encode URL khi có ký tự đặc biệt
+        (dấu cách, tiếng Việt, /...). Nếu không decode thì
+        my%20file.pdf sẽ không khớp với file thật tên my file.pdf.
+    */
+
+    std::string path = Http::UrlDecode(req.http_url);
     std::string key = MethodToString(req.method) + ":" + path;
 
-    // 1. Khớp tuyệt đối trước (Exact Match)
+    /*
+        Khi đã lấy được phương thức và URL sẽ check xem là đường dẫn
+        tuyết đối hay tương đối
+    */
     auto it = routes.find(key);
     if (it != routes.end())
     {
@@ -115,7 +144,10 @@ void Http::Router::Dispatch(int fd, const HttpRequest &req)
         return;
     }
 
-    // 2. Khớp tiền tố (Wildcard / Prefix Match, ví dụ route path kết thúc bằng *)
+    /*
+        Khớp tiền tố  Wildcard / Prefix Match, thì sẽ duyệt các
+        route đuôi có dấu * ví du: GET:/api/download/*
+    */
     for (const auto &pair : routes)
     {
         const std::string &route_key = pair.first;
@@ -131,6 +163,7 @@ void Http::Router::Dispatch(int fd, const HttpRequest &req)
         }
     }
 
+    // không khớp gì cả thì trả về trang chủ :3
     if (fallback_handler)
     {
         fallback_handler(fd, req);

@@ -1,6 +1,6 @@
 /*!
     \file HttpStatic.h
-    \brief Static file serving with MIME detection and path traversal protection
+    \brief Helper functions for serving static files
     \author HungForre
     \date 7/6/2026
     \copyright VDT
@@ -25,6 +25,11 @@ namespace Http
 
     inline std::string_view MimeType(std::string_view path)
     {
+        /*
+            Tìm dấu chấm '.' cuối cùng trong tên đường dẫn để xác định
+            đuôi mở rộng của file. Nếu không thấy dấu chấm nào, trả về kiểu
+            mặc định "application/octet-stream"
+        */
         auto pos = path.rfind('.');
         if (pos == std::string_view::npos)
             return "application/octet-stream";
@@ -68,52 +73,54 @@ namespace Http
         return "application/octet-stream";
     }
 
-    inline void ServeFile(int fd, const HttpRequest &req, std::string_view web_root, std::string_view req_range = "")
+    inline void ServeFile(int fd, const HttpRequest &req, std::string_view url_to_serve, std::string_view web_root, bool inline_view)
     {
-        std::string decoded_url = Http::UrlDecode(req.http_url);
+        std::string decoded_url = Http::UrlDecode(url_to_serve);
         std::string_view url_path = decoded_url;
-        bool force_download = false;
-        auto qpos = url_path.find('?');
-        if (qpos != std::string_view::npos)
-        {
-            std::string_view query = url_path.substr(qpos + 1);
 
-            if (query.find("download=true") != std::string_view::npos)
-            {
-                force_download = true;
-            }
-
-            url_path = url_path.substr(0, qpos);
-        }
-
-        // 2. Mặc định URL "/" → index.html
+        /*
+            Nếu truy cập rỗng hoặc / thì mặc định là index.html
+        */
         std::string rel_path(url_path);
         if (rel_path.empty() || rel_path == "/")
             rel_path = "/index.html";
 
-        // 3. Xây dựng đường dẫn đầy đủ
+        // Xây đường dẫn dầy đủ đến chỗ file
         std::string full_path = std::string(web_root) + rel_path;
 
-        // 4. Canonical hóa đường dẫn (Chống leo rào)
+        /*
+        Hàm std::filesystem::weakly_canonical có nhiệm vụ chuẩn hóa đường dẫn
+         (loại bỏ các ký tự thừa như ., .., hoặc các liên kết - symlinks)
+         để đưa về một đường dẫn tuyệt đối duy nhất và "sạch sẽ" nhất,
+         ngay cả khi file đó chưa tồn tại.
+         để tránh hacker kiểu : ../../../../etc/passwd
+
+        */
         std::error_code ec;
         auto canonical_file = std::filesystem::weakly_canonical(full_path, ec);
         auto canonical_root = std::filesystem::weakly_canonical(std::string(web_root), ec);
-
         std::string file_str = canonical_file.string();
         std::string root_str = canonical_root.string();
+
         if (!root_str.empty() && root_str.back() != '/' && root_str.back() != '\\')
         {
             root_str += '/';
         }
 
-        // 5. Kiểm tra bảo mật
+        /*
+        Kiểm tra xem file yêu cầu có nằm trong thư mục gốc được phép phục vụ hay không.
+        Nếu hacker dùng mẹo gửi ../../etc/passwd làm đường dẫn file nhảy ra ngoài thư mục gốc,
+        hệ thống sẽ chặn đứng và trả về lỗi 403 Forbidden
+        */
         if (file_str.size() < root_str.size() || file_str.substr(0, root_str.size()) != root_str)
         {
             Error(fd, 403, "Forbidden");
             return;
         }
 
-        // 6. Lấy kích thước file
+        /*
+            Kiểm tra xem file có thực sự tồn tại
+        */
         struct stat file_stat{};
         if (stat(file_str.c_str(), &file_stat) < 0)
         {
@@ -122,31 +129,9 @@ namespace Http
         }
         off_t file_size = file_stat.st_size;
 
-        // Caching: Tạo tiêu đề Last-Modified dạng GMT
-        char last_mod_str[64];
-        struct tm *tm_info = std::gmtime(&file_stat.st_mtime);
-        std::strftime(last_mod_str, sizeof(last_mod_str), "%a, %d %b %Y %H:%M:%S GMT", tm_info);
-
-        // Kiểm tra If-Modified-Since từ client
-        std::string_view if_mod_since = "";
-        auto it_mod = req.header.find("If-Modified-Since");
-        if (it_mod != req.header.end())
-        {
-            if_mod_since = it_mod->second;
-        }
-
-        if (!if_mod_since.empty() && if_mod_since == last_mod_str)
-        {
-            // File không đổi, trả về 304 rỗng để tiết kiệm băng thông mạng
-            std::string res = "HTTP/1.1 304 Not Modified\r\n"
-                              "Last-Modified: " +
-                              std::string(last_mod_str) + "\r\n"
-                                                          "Connection: keep-alive\r\n\r\n";
-            send(fd, res.data(), res.size(), MSG_NOSIGNAL);
-            return;
-        }
-
-        // 7. Mở file
+        /*
+            Mở file
+        */
         int file_fd = open(file_str.c_str(), O_RDONLY);
         if (file_fd < 0)
         {
@@ -154,7 +139,6 @@ namespace Http
             return;
         }
 
-        // ---- Trích xuất Tên file từ đường dẫn tương đối ----
         std::string_view filename = rel_path;
         auto slash_pos = filename.rfind('/');
         if (slash_pos != std::string_view::npos)
@@ -162,75 +146,41 @@ namespace Http
             filename = filename.substr(slash_pos + 1);
         }
 
-        // ---- Xử lý Tải Tiếp (IDM / Pause & Resume) ----
-        off_t offset = 0;
-        off_t send_size = file_size;
-        bool is_partial = false;
-
-        // Nếu Client xin tải tiếp từ một vị trí (ví dụ: bytes=1048576-)
-        if (!req_range.empty() && req_range.find("bytes=") == 0)
-        {
-            auto dash_pos = req_range.find('-');
-            if (dash_pos != std::string_view::npos)
-            {
-                std::string start_str = std::string(req_range.substr(6, dash_pos - 6));
-                std::string end_str = std::string(req_range.substr(dash_pos + 1));
-
-                off_t start_byte = start_str.empty() ? 0 : std::stoll(start_str);
-                off_t end_byte = end_str.empty() ? file_size - 1 : std::stoll(end_str);
-
-                if (start_byte < file_size)
-                {
-                    if (end_byte >= file_size)
-                        end_byte = file_size - 1;
-                    offset = start_byte;
-                    send_size = end_byte - start_byte + 1;
-                    is_partial = true;
-                }
-            }
-        }
-
-        // 8. Ráp Header gửi về
+        // Ráp Header gửi về
         std::string header;
         header.reserve(512);
 
-        if (is_partial)
-        {
-            header += "HTTP/1.1 206 Partial Content\r\n";
-            header += "Content-Range: bytes " + std::to_string(offset) + "-" +
-                      std::to_string(offset + send_size - 1) + "/" + std::to_string(file_size) + "\r\n";
-        }
-        else
-        {
-            header += "HTTP/1.1 200 OK\r\n";
-            header += "Accept-Ranges: bytes\r\n"; // Báo cho IDM biết là hỗ trợ tải tiếp
-        }
+        header += "HTTP/1.1 200 OK\r\n";
 
         header += "Content-Type: ";
-        header += MimeType(rel_path); // FIX: Dùng rel_path thay vì file_str để tránh sai đuôi mở rộng khi root path có dấu "."
+        header += MimeType(rel_path);
         header += "\r\nContent-Length: ";
-        header += std::to_string(send_size);
+        header += std::to_string(file_size);
         header += "\r\n";
 
-        // ---- Ép trình duyệt "Save As" ----
-        if (force_download)
+        // ---- Thiết lập Content-Disposition theo cờ inline_view ----
+        if (inline_view)
+        {
+            header += "Content-Disposition: inline\r\n";
+        }
+        else
         {
             header += "Content-Disposition: attachment; filename=\"";
             header += filename;
             header += "\"\r\n";
         }
-        header += "Last-Modified: " + std::string(last_mod_str) + "\r\n";
+
         header += "Access-Control-Allow-Origin: *\r\nConnection: keep-alive\r\n\r\n";
         send(fd, header.data(), header.size(), MSG_NOSIGNAL);
 
         // Thiết lập trạng thái gửi file ngầm, không tự gửi đồng bộ nữa
-        HttpRequest* mutable_req = const_cast<HttpRequest*>(&req);
-        mutable_req->is_sending_file = true;
-        mutable_req->file_fd = file_fd;
-        mutable_req->file_offset = offset;
-        mutable_req->file_remaining = send_size;
-        mutable_req->last_speed_check_time = time(nullptr);
-        mutable_req->bytes_sent_in_period = 0;
+
+        req.is_sending_file = true;
+        req.file_fd = file_fd;
+        req.file_offset = 0;
+        req.file_remaining = file_size;
+        req.last_speed_check_time = time(nullptr);
+        req.bytes_sent_in_period = 0;
     }
 
 } // namespace Http
