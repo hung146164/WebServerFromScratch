@@ -44,7 +44,8 @@ void HttpRequest::Reset()
     start_idx = 0;
     curr_idx = 0;
     client_ip.clear();
-    if (file_fd != -1) {
+    if (file_fd != -1)
+    {
         close(file_fd);
         file_fd = -1;
     }
