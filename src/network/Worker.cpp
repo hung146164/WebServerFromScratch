@@ -144,6 +144,10 @@ void Worker::StartWorker()
               << (worker_id % std::thread::hardware_concurrency()) << "\n";
     is_running = true;
 
+    /*
+        Chờ sự kiện mạng, timeout 500ms.
+        Nếu không có gì trong 500ms thì thoát để chạy timeout check bên dưới.
+    */
     time_t last_timeout_check = 0;
     while (is_running)
     {
@@ -151,6 +155,10 @@ void Worker::StartWorker()
                              client_events.data(),
                              config.max_epoll_events,
                              500); // 500ms timeout
+
+        /*
+            Nếu bị ngắt bởi signal (EINTR) thì thử lại. Lỗi thật thì thoát vòng lặp.
+        */
         if (cnt < 0)
         {
             if (errno == EINTR)
@@ -167,21 +175,28 @@ void Worker::StartWorker()
                 int fd = client_events[i].data.fd;
                 uint32_t events = client_events[i].events;
 
+                /*
+                    Client ngắt kết nối (RDHUP),
+                    kết nối bị treo (HUP), hoặc
+                    lỗi socket (ERR)
+                */
                 if (events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR))
                 {
                     CloseConnection(fd);
                     continue;
                 }
 
+                // Nếu có client mới thì accept
                 if (fd == server_socket.GetSocketfd())
                 {
                     AcceptClient();
                 }
                 else
                 {
+                    // Client có cờ này tức là đang download file
                     if (events & EPOLLOUT)
                     {
-                        HttpRequest* req = lru.GetWithoutMove(fd);
+                        HttpRequest *req = lru.GetWithoutMove(fd);
                         if (req && req->is_sending_file)
                         {
                             ContinueSendFile(fd, req);
@@ -189,6 +204,7 @@ void Worker::StartWorker()
                         }
                     }
 
+                    // Có dữ liệu đến từ client, đọc và xử lý HTTP request.
                     if (events & EPOLLIN)
                     {
                         HandleRequest(fd);
@@ -197,7 +213,12 @@ void Worker::StartWorker()
             }
         }
 
-        // Run periodic idle connection cleanup (every 1s)
+        /*
+            Mỗi giây sẽ quét LRU một lần kích những
+            connection không gửi nhận gì quá 1s
+            vì LRU đã sắp xếp theo cũ nhất nên ko lo kick nhầm
+
+        */
         if (now - last_timeout_check >= 1)
         {
             last_timeout_check = now;
@@ -220,7 +241,7 @@ void Worker::StartWorker()
             }
         }
     }
-        std::cout << "[Worker " << worker_id << "] Event Loop stopped.\n";
+    std::cout << "[Worker " << worker_id << "] Event Loop stopped.\n";
 }
 
 void Worker::StopWorker()
@@ -232,9 +253,15 @@ void Worker::CloseConnection(int fd)
 {
     epoll_ctl(epoll_socket.GetSocketfd(), EPOLL_CTL_DEL, fd, nullptr);
 
-    // Set SO_LINGER with a timeout of 0 to force connection termination (RST)
-    // and discard any unsent/unacknowledged data in the send buffer immediately.
-    // This avoids keeping the memory allocated during background TCP retransmissions.
+    /*
+        Mặc định khi close() thông thường: Hệ điều hành sẽ cố gắng gửi
+        nốt số dữ liệu còn kẹt trong buffer mạng (từ lệnh sendfile trước đó)
+        rồi mới đóng
+
+        Khi cấu hình l_onoff = 1 và l_linger = 0, Sẽ yêu cầu bỏ qua quy trình
+        đóng thông thường, hủy liên kết ngay lập tức
+        Socket bị đóng ngay mà không đi qua trạng thái chờ TIME_WAIT của TCP
+    */
     struct linger sl;
     sl.l_onoff = 1;
     sl.l_linger = 0;
@@ -242,13 +269,17 @@ void Worker::CloseConnection(int fd)
 
     shutdown(fd, SHUT_WR);
     char buf[128];
+
+    /*
+        Đọc hết dữ liệu còn tồn đọng trong receive buffer
+        để tránh kernel gửi RST không cần thiết.
+    */
     while (recv(fd, buf, sizeof(buf), 0) > 0)
     {
     }
 
     close(fd);
 
-    // Decrement connection count for this IP
     HttpRequest *req = lru.GetWithoutMove(fd);
     if (req && !req->client_ip.empty())
     {
@@ -269,6 +300,10 @@ void Worker::AcceptClient()
 
     while (true)
     {
+        /*
+            accept4 non-blocking, là một hàm nâng cao của accept
+            giúp có thể thiết lập cờ đồng thời.
+        */
         int client_fd = accept4(server_socket.GetSocketfd(),
                                 (sockaddr *)&client_addr,
                                 &client_len,
@@ -285,7 +320,7 @@ void Worker::AcceptClient()
             break;
         }
 
-        // Get client IP address
+        // Lấy ip
         char ip_str[INET_ADDRSTRLEN];
         std::string client_ip = "0.0.0.0";
         if (inet_ntop(AF_INET, &(client_addr.sin_addr), ip_str, INET_ADDRSTRLEN))
@@ -293,12 +328,9 @@ void Worker::AcceptClient()
             client_ip = ip_str;
         }
 
-        // Enforce max connection per IP limit
         if (ip_connections[client_ip] >= config.max_client_per_ip)
         {
-            std::string limit_msg = "[IP Limit] Rejecting client from " + client_ip 
-                                   + " on Worker " + std::to_string(worker_id) 
-                                   + " (Limit " + std::to_string(config.max_client_per_ip) + " reached)\n";
+            std::string limit_msg = "[IP Limit] Rejecting client from " + client_ip + " on Worker " + std::to_string(worker_id) + " (Limit " + std::to_string(config.max_client_per_ip) + " reached)\n";
             std::cout << limit_msg;
             close(client_fd);
             continue;
@@ -315,6 +347,11 @@ void Worker::AcceptClient()
             }
         }
 
+        /*Thiết lập 3 cờ
+        EPOLLIN(Đọc),
+        EPOLLET(Edge-Triggered),
+        EPOLLRDHUP(client đóng kết nối)
+        */
         epoll_event ev{};
         ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
         ev.data.fd = client_fd;
@@ -338,6 +375,7 @@ void Worker::AcceptClient()
 
 void Worker::ProcessHttpRequest(int fd, HttpRequest *request)
 {
+    // Đinh tuyến đến handler đăng kí
     Http::Router::Dispatch(fd, *request);
 }
 
@@ -353,7 +391,10 @@ void Worker::HandleRequest(int fd)
     {
         if (request->is_sending_file)
             break;
-
+        /*
+            Kiểm tra nếu payload hiện tại cbi vượt qua X kb của cache thì bỏ
+            cache hiện tại đang size max là 64kb
+        */
         int space = capacity - request->tail_idx;
         if (space <= 0)
         {
@@ -363,18 +404,35 @@ void Worker::HandleRequest(int fd)
             return;
         }
 
+        // lấy con trỏ kí tự cuối ở cache, thêm text vào
         char *write_ptr = &request->cache[request->tail_idx];
         ssize_t bytes_read = recv(fd, write_ptr, (int)space, 0);
 
         if (bytes_read < 0)
         {
+
+            /*
+                EAGAIN / EWOULDBLOCK: socket non-blocking,
+                không có dữ liệu nào trong buffer của kernel lúc này ,
+                chỉ là "chưa có gì, thử lại sau". break thoát vòng ngoài,
+                chờ EPOLLIN event tiếp theo.
+            */
             if (errno == EAGAIN || errno == EWOULDBLOCK)
                 break;
+
+            /*
+                bị ngắt quãng bởi signal
+            */
             if (errno == EINTR)
                 continue;
+
+            // lỗi thực sự
             CloseConnection(fd);
             return;
         }
+        /*
+            tín hiệu báo đã đóng connection
+        */
         else if (bytes_read == 0)
         {
             CloseConnection(fd);
@@ -386,11 +444,22 @@ void Worker::HandleRequest(int fd)
         bool connection_closed = false;
         while (true)
         {
+            /*
+                Vòng lặp để xử lý HTTP pipelining, 1 lần recv() có thể chứa nhiều request
+                nối đuôi nhau trong cùng TCP packet.
+                Parse() chạy state machine qua buffer từ curr_idx đến tail_idx,
+                trả về trạng thái hiện tại.
+            */
             const HttpParserState *state = request->Parse();
 
             if (state == CompleteState::Instance())
             {
+                // Khi đã Parse xong xử lý request
                 ProcessHttpRequest(fd, request);
+
+                /*Nếu request là tải file thì bỏ Epollin(đọc) để xử lý tải xuống
+                Nếu ở cuối request 1 có thừa một chút của request 2 thì cắt cho lên luôn
+                */
 
                 if (request->is_sending_file)
                 {
@@ -406,14 +475,14 @@ void Worker::HandleRequest(int fd)
                                      (int)remain);
                     request->NextRequest(remain);
                     lru.MakeRecent(fd);
-                    
-                    // Call ContinueSendFile immediately to start the write process
+
                     ContinueSendFile(fd, request);
 
                     connection_closed = true;
                     break;
                 }
-
+                // request 1 đã xử lý xong cắt request 2 lên đầu tiên
+                // Reset các con trỏ duyệt về 0.
                 int remain = request->tail_idx - request->curr_idx;
                 if (remain > 0)
                     std::memmove(&request->cache[0],
@@ -439,14 +508,13 @@ void Worker::HandleRequest(int fd)
             return;
     }
 }
-
 void Worker::UpdateConfig(ServerConfig config_)
 {
     config.read_timeout_sec = config_.read_timeout_sec;
     config.max_client_per_ip = config_.max_client_per_ip;
 }
 
-void Worker::ContinueSendFile(int fd, HttpRequest* req)
+void Worker::ContinueSendFile(int fd, HttpRequest *req)
 {
     time_t now = time(nullptr);
 
@@ -476,16 +544,17 @@ void Worker::ContinueSendFile(int fd, HttpRequest* req)
         }
     }
 
+    /*
+        Nếu thời gian tải đã lớn hơn 5s mà tốc độ tải của client< 5kb
+        thì sẽ kick luôn.
+    */
     time_t elapsed = now - req->last_speed_check_time;
-    std::cout << "[DEBUG] ContinueSendFile fd: " << fd << ", elapsed: " << elapsed 
-              << ", bytes_sent: " << req->bytes_sent_in_period << ", remaining: " << req->file_remaining << "\n";
     if (elapsed >= 5)
     {
         double speed = (double)req->bytes_sent_in_period / elapsed;
-        std::cout << "[DEBUG] Speed check fd: " << fd << ", speed: " << (speed / 1024.0) << " KB/s\n";
         if (speed < 5120.0)
         {
-            std::cout << "[Slow Connection] Kicking client fd " << fd 
+            std::cout << "[Slow Connection] Kicking client fd " << fd
                       << " due to low speed: " << (speed / 1024.0) << " KB/s\n";
             CloseConnection(fd);
             return;
@@ -493,7 +562,7 @@ void Worker::ContinueSendFile(int fd, HttpRequest* req)
         req->last_speed_check_time = now;
         req->bytes_sent_in_period = 0;
     }
-
+    // Nếu gửi xong thì bật lại EpollIn ,bỏ epollout, đóng file
     if (req->file_remaining == 0)
     {
         close(req->file_fd);
@@ -505,4 +574,8 @@ void Worker::ContinueSendFile(int fd, HttpRequest* req)
         ev.data.fd = fd;
         epoll_ctl(epoll_socket.GetSocketfd(), EPOLL_CTL_MOD, fd, &ev);
     }
+    /*Nếu chưa xong hàng đợi dữ liệu ở client đang đầy chưa thể gửi thêm
+    thì sẽ gửi ở sự kiên epoll out tiếp theo khi hàng đợi dữ liệu của client
+    có thể gửi
+    */
 }
