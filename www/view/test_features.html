@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kiểm Thử Tính Năng - WebServerVdt</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .console-section {
+      margin-top: 2rem;
+    }
+    .row-flex {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-end;
+    }
+    .row-flex .form-group {
+      margin-bottom: 0;
+      flex: 1;
+    }
+    .preview-box {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: rgba(0,0,0,0.2);
+      border-radius: 10px;
+      font-size: 0.85rem;
+      border: 1px solid var(--border-card);
+      word-break: break-all;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-container">
+        <div class="logo-icon">V</div>
+        <div class="logo-text">WebServerVdt</div>
+      </div>
+      <nav>
+        <a href="index.html">Dashboard</a>
+        <a href="test_features.html" class="active">Tính năng</a>
+        <a href="test_benchmark.html">Hiệu năng</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="badge badge-info">Kiểm Thử Tương Tác</div>
+      <h1>Kiểm Thử Tính Năng</h1>
+      <p>Thực hiện các truy vấn đặc thù để kiểm thử các cơ chế nâng cao được lập trình trong nhân máy chủ C++.</p>
+    </section>
+
+    <div class="feature-grid">
+      <!-- 1. Heavy File Download Card -->
+      <div class="card">
+        <div class="badge badge-success">Zero-Copy Sendfile</div>
+        <h2>Tải File Nặng (1.5GB)</h2>
+        <p>Truyền dữ liệu trực tiếp từ đĩa cứng sang card mạng ở không gian nhân (Kernel Space) bằng <code>sendfile</code>, không tốn tài nguyên RAM của Server hay Client. Tải trực tiếp về thư mục Downloads của bạn.</p>
+        
+        <a href="/api/download/heavy_1.5gb.bin" class="btn btn-primary" style="width: 100%; text-decoration: none; margin-top: 1rem; text-align: center; display: block;" onclick="logToConsole('Bắt đầu tải tệp tin 1.5GB qua sendfile zero-copy. Trình duyệt đang thực hiện tải về đĩa cứng...', 'warning')">
+          Tải File 1.5GB Về Máy
+        </a>
+        <div id="download-status" class="preview-box" style="font-size:0.8rem; color:var(--text-muted);">
+          Gợi ý: Nhấn chuột để kích hoạt download gốc của trình duyệt (xem tiến độ tải ở mục Download của Chrome/Firefox).
+        </div>
+      </div>
+
+      <!-- 2. Light File Download Card -->
+      <div class="card">
+        <div class="badge badge-success">MIME & Content-Disposition</div>
+        <h2>Tải Tài Nguyên Nhẹ (CSS & PDF)</h2>
+        <p>So sánh sự khác biệt khi trình duyệt tự động hiển thị tài nguyên tĩnh và khi ép buộc trình duyệt tải xuống (Save As) bằng tham số <code>?download=true</code>.</p>
+        
+        <div style="margin-top: 1rem;">
+          <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-muted);">Tài liệu PDF (222.pdf):</h4>
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <a href="/api/view/222.pdf" target="_blank" class="btn btn-secondary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Mở tài liệu 222.pdf trên tab mới để xem trực tiếp...', 'info')">
+              Xem trực tiếp PDF
+            </a>
+            <a href="/api/download/222.pdf" class="btn btn-primary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Yêu cầu tải tệp 222.pdf về đĩa cứng...', 'success')">
+              Tải file PDF
+            </a>
+          </div>
+
+          <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-muted);">Hình ảnh JPEG (333.jpg):</h4>
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <a href="/api/view/333.jpg" target="_blank" class="btn btn-secondary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Mở hình ảnh 333.jpg trên tab mới để xem trực tiếp...', 'info')">
+              Xem trực tiếp Ảnh
+            </a>
+            <a href="/api/download/333.jpg" class="btn btn-primary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Yêu cầu tải tệp hình ảnh 333.jpg về đĩa cứng...', 'success')">
+              Tải file Ảnh
+            </a>
+          </div>
+
+          <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-muted);">Tệp giao diện CSS (style.css):</h4>
+          <div style="display: flex; gap: 0.5rem;">
+            <a href="/api/view/style.css" target="_blank" class="btn btn-secondary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Mở tệp style.css để xem mã nguồn định dạng...', 'info')">
+              Xem code CSS
+            </a>
+            <a href="/api/download/style.css" class="btn btn-primary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Yêu cầu tải tệp style.css về máy...', 'success')">
+              Tải file CSS
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. File Upload Card -->
+      <div class="card">
+        <div class="badge badge-success">Upload Parser</div>
+        <h2>Tải Lên File (POST Upload)</h2>
+        <p>Gửi file sử dụng chuẩn định dạng <code>multipart/form-data</code>. Trình phân tách nhị phân của C++ sẽ trích xuất tên file và ghi đè xuống thư mục lưu trữ.</p>
+        
+        <div class="form-group" style="margin-top: 1rem;">
+          <label>Chọn tệp tin bất kỳ:</label>
+          <input type="file" id="file-input" style="width: 100%;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem; line-height: 1.35;">
+            <strong>Hỗ trợ:</strong> .html, .htm, .css, .js, .json, .xml, .txt, .png, .jpg, .jpeg, .gif, .svg, .ico, .webp, .woff, .woff2, .ttf, .pdf, .zip<br>
+            <strong>Hạn mức dung lượng:</strong> &le; 50 KB
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="btn-upload" style="width: 100%;">Tải lên Server</button>
+        <div id="upload-status" class="preview-box">Chưa tải file lên. Thư mục lưu trữ: <code>/www/upload/</code></div>
+      </div>
+
+      <!-- 4. JSON Parser Card -->
+      <div class="card">
+        <div class="badge badge-success">Arena JSON Parser</div>
+        <h2>Phân Tích JSON Học Sinh</h2>
+        <p>Gửi payload danh sách học sinh thô định dạng JSON để phân tích tổng hợp. Bộ nhớ đệm phân đoạn (Arena Node Pool) C++ sẽ tự động giới hạn độ sâu cây để ngăn chặn DoS.</p>
+        
+        <div class="form-group" style="margin-top: 1rem;">
+          <label>Dữ liệu JSON đầu vào:</label>
+          <textarea id="json-input" style="width: 100%; height: 120px; font-family: monospace; font-size: 0.8rem; background: rgba(0,0,0,0.2); color: #fff; border: 1px solid var(--border-card); border-radius: 5px; padding: 0.5rem; box-sizing: border-box; resize: vertical;">[
+  {"name": "Nguyen Van A", "age": 20, "gpa": 3.85},
+  {"name": "Tran Thi B", "age": 21, "gpa": 3.92},
+  {"name": "Le Minh C", "age": 19, "gpa": 3.45}
+]</textarea>
+        </div>
+
+        <div style="display: flex; gap: 0.35rem; margin-bottom: 0.75rem;">
+          <button class="btn btn-secondary" id="btn-json-gen-100" style="flex: 1; font-size: 0.75rem; padding: 0.4rem 0.25rem;">Sinh 100</button>
+          <button class="btn btn-secondary" id="btn-json-gen-500" style="flex: 1; font-size: 0.75rem; padding: 0.4rem 0.25rem;">Sinh 500</button>
+          <button class="btn btn-secondary" id="btn-json-gen-10000" style="flex: 1; font-size: 0.75rem; padding: 0.4rem 0.25rem;">Sinh 10000</button>
+        </div>
+
+        <button class="btn btn-primary" id="btn-parse-json" style="width: 100%;">Phân tích cú pháp C++</button>
+        <div id="json-status" class="preview-box">Chưa chạy kiểm thử JSON.</div>
+      </div>
+    </div>
+
+    <!-- Live Console logs -->
+    <div class="console-section">
+      <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <h3 style="margin:0;">Nhật ký tương tác (Live Console)</h3>
+        <button class="btn btn-secondary" id="btn-clear-console" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;">Xóa logs</button>
+      </div>
+      <div id="console-logs" style="background:#1e1e2e; border: 1px solid var(--border-card); border-radius: 10px; height: 200px; overflow-y: auto; padding: 1rem; font-family: monospace; font-size: 0.85rem; line-height: 1.4;">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Helper Ghi Log Ra Console Giao Diện ---
+    function logToConsole(message, type = 'info') {
+      const consoleBox = document.getElementById('console-logs');
+      const time = new Date().toLocaleTimeString();
+      let color = '#fff';
+      if (type === 'success') color = 'var(--success)';
+      if (type === 'error') color = 'var(--error)';
+      if (type === 'warning') color = 'var(--warning)';
+      if (type === 'info') color = '#8aadf4';
+
+      consoleBox.innerHTML += `<div style="color: ${color}; margin-bottom: 0.25rem;">[${time}] ${message}</div>`;
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+
+    logToConsole('Giao diện kiểm thử 4 API cốt lõi đã sẵn sàng.', 'success');
+
+    document.getElementById('btn-clear-console').addEventListener('click', () => {
+      document.getElementById('console-logs').innerHTML = '';
+      logToConsole('Console cleared.', 'info');
+    });
+
+    // --- Helper để sinh ngẫu nhiên JSON danh sách học sinh ---
+    function generateRandomStudents(count) {
+      logToConsole(`Đang sinh ngẫu nhiên ${count} học sinh...`, 'info');
+      const students = [];
+      const firstNames = ['Nguyen', 'Tran', 'Le', 'Pham', 'Hoang', 'Phan', 'Vu', 'Vo', 'Dang', 'Bui'];
+      const middleNames = ['Van', 'Thi', 'Minh', 'Anh', 'Duc', 'Hoang', 'Khanh', 'Ngoc', 'Hai', 'Quang'];
+      const lastNames = ['An', 'Binh', 'Cuong', 'Dung', 'Em', 'Giang', 'Hai', 'Khanh', 'Linh', 'Minh'];
+      
+      for (let i = 0; i < count; i++) {
+        const fn = firstNames[Math.floor(Math.random() * firstNames.length)];
+        const mn = middleNames[Math.floor(Math.random() * middleNames.length)];
+        const ln = lastNames[Math.floor(Math.random() * lastNames.length)];
+        students.push({
+          name: `${fn} ${mn} ${ln}`,
+          age: 18 + (i % 6),
+          gpa: parseFloat((2.0 + Math.random() * 2.0).toFixed(2))
+        });
+      }
+      document.getElementById('json-input').value = JSON.stringify(students, null, 2);
+      logToConsole(`Đã sinh xong ${count} học sinh. Nhấp "Phân tích cú pháp C++" để gửi.`, 'success');
+    }
+
+    document.getElementById('btn-json-gen-100').addEventListener('click', () => generateRandomStudents(100));
+    document.getElementById('btn-json-gen-500').addEventListener('click', () => generateRandomStudents(500));
+    document.getElementById('btn-json-gen-10000').addEventListener('click', () => generateRandomStudents(10000));
+
+    // --- 3. POST File Upload Logic ---
+    document.getElementById('btn-upload').addEventListener('click', async () => {
+      const fileInput = document.getElementById('file-input');
+      if (fileInput.files.length === 0) {
+        logToConsole('Vui lòng chọn một tệp trước khi nhấn Tải lên.', 'error');
+        return;
+      }
+      
+      const file = fileInput.files[0];
+      logToConsole(`Đang chuẩn bị upload tệp tin: ${file.name} (${(file.size/1024).toFixed(2)} KB)...`, 'info');
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+        
+        let json = null;
+        try {
+          json = await res.json();
+        } catch(e) {}
+        
+        if (res.status === 201 && json) {
+          logToConsole(`Upload tệp tin thành công! File lưu trên Server: ${json.filename}`, 'success');
+          document.getElementById('upload-status').innerHTML = `
+            <span style="color:var(--success); font-weight:bold;">Thành công!</span><br>
+            <strong>Tên file gốc:</strong> ${file.name}<br>
+            <strong>Tên lưu trữ:</strong> ${json.filename}<br>
+            <strong>Kích thước:</strong> ${(file.size/1024).toFixed(2)} KB
+          `;
+        } else {
+          const errMsg = json ? json.error : 'Không rõ nguyên nhân';
+          logToConsole(`Upload thất bại! Mã HTTP: ${res.status}. Chi tiết: ${errMsg}`, 'error');
+          document.getElementById('upload-status').innerHTML = `
+            <span style="color:var(--error); font-weight:bold;">Thành công (HTTP ${res.status})!</span><br>
+            <strong>Lỗi:</strong> ${errMsg}
+          `;
+        }
+      } catch (err) {
+        logToConsole(`Lỗi Upload: ${err.message}`, 'error');
+      }
+    });
+
+    // --- 4. POST JSON Parser Logic ---
+    document.getElementById('btn-parse-json').addEventListener('click', async () => {
+      const jsonText = document.getElementById('json-input').value.trim();
+      if (!jsonText) {
+        logToConsole('Vui lòng nhập dữ liệu JSON học sinh.', 'error');
+        return;
+      }
+      
+      logToConsole('Gửi danh sách học sinh (JSON) lên Server phân tích...', 'info');
+      const start = performance.now();
+      
+      try {
+        const res = await fetch('/api/parse_students', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: jsonText
+        });
+        
+        const elapsed = (performance.now() - start).toFixed(2);
+        
+        let json = null;
+        try {
+          json = await res.json();
+        } catch(e) {}
+        
+        if (res.status === 200 && json) {
+          logToConsole(`Phân tích thành công! Thời gian phản hồi mạng: ${elapsed} ms. C++ Parse time: ${json.parsing_time_us} μs.`, 'success');
+          document.getElementById('json-status').innerHTML = `
+            <span style="color:var(--success); font-weight:bold;">Thành công!</span><br>
+            <strong>Tổng số học sinh:</strong> ${json.total_students}<br>
+            <strong>Điểm GPA trung bình:</strong> ${json.average_gpa.toFixed(2)}<br>
+            <strong>Thủ khoa:</strong> ${json.top_student} (${json.max_gpa.toFixed(2)})<br>
+            <strong>Thời gian C++ xử lý:</strong> ${json.parsing_time_us} μs (${(json.parsing_time_us / 1000).toFixed(3)} ms)<br>
+            <strong>Trạng thái Pool:</strong> An toàn (dưới 10k nodes)
+          `;
+        } else if (res.status === 413) {
+          logToConsole('Thất bại: HTTP 413 Payload Too Large (Bộ nhớ Pool C++ Arena chặn DoS thành công!)', 'error');
+          document.getElementById('json-status').innerHTML = `
+            <span style="color:var(--error); font-weight:bold;">Thất bại (HTTP 413 Payload Too Large)!</span><br>
+            <strong>Chi tiết:</strong> Vượt ngưỡng bộ nhớ tĩnh 10,000 nodes.<br>
+            <em>Giải thích: Memory Pool của luồng C++ bị cạn kiệt, ngoại lệ được bắt an toàn giúp ngăn chặn sập tiến trình (DoS Bomb Prevention)!</em>
+          `;
+        } else {
+          const errorMsg = json ? json.error : 'Malformed JSON or invalid schema';
+          logToConsole(`Thất bại: Mã lỗi HTTP ${res.status} - ${errorMsg}`, 'error');
+          document.getElementById('json-status').innerHTML = `
+            <span style="color:var(--error); font-weight:bold;">Thất bại (HTTP ${res.status})!</span><br>
+            <strong>Lỗi:</strong> ${errorMsg}
+          `;
+        }
+      } catch (err) {
+        logToConsole(`Lỗi Phân tích: ${err.message}`, 'error');
+      }
+    });
+  </script>
+</body>
+</html>
