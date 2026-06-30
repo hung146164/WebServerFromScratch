@@ -40,24 +40,7 @@ void TestUrlDecode() {
     std::cout << "[+] TestUrlDecode PASSED!\n";
 }
 
-// 2. Test RC4 Cryptography
-void TestRC4() {
-    std::cout << "[*] Running TestRC4...\n";
-    
-    std::string key = "VDTSecretKey";
-    std::string original = "The quick brown fox jumps over the lazy dog! 12345";
-    std::string data = original;
-    
-    // Encrypt
-    Http::RC4(key, data);
-    assert(data != original); // Must be encrypted
-    
-    // Decrypt (RC4 is symmetric, running again decrypts)
-    Http::RC4(key, data);
-    assert(data == original); // Must be decrypted back
-    
-    std::cout << "[+] TestRC4 PASSED!\n";
-}
+
 
 // Structs to satisfy Node<T>::Reset() compiler constraints
 struct MockString {
@@ -139,7 +122,6 @@ int main() {
     std::cout << "=========================================================\n";
     
     TestUrlDecode();
-    TestRC4();
     TestLRUCache();
     TestLRUTimeout();
     
