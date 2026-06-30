@@ -48,7 +48,7 @@ void view_handler(int fd, const HttpRequest &request)
     {
         url_to_serve = "/";
     }
-    Http::ServeFile(fd, request, url_to_serve, "www", true);
+    Http::ServeFile(fd, request, url_to_serve, "www/view", true);
 }
 
 void download_handler(int fd, const HttpRequest &request)
@@ -62,17 +62,17 @@ void download_handler(int fd, const HttpRequest &request)
     {
         url_to_serve = "/";
     }
-    Http::ServeFile(fd, request, url_to_serve, "www", false);
+    Http::ServeFile(fd, request, url_to_serve, "www/download", false);
 }
 
 void fallback_test(int fd, const HttpRequest &request)
 {
-    Http::ServeFile(fd, request, request.http_url, "www", true);
+    Http::ServeFile(fd, request, request.http_url, "www/view", true);
 }
 
 void parse_students_handler(int fd, const HttpRequest &req)
 {
-    thread_local Json::JsonParser parser(1000);
+    thread_local Json::JsonParser parser(5000);
 
     try
     {
