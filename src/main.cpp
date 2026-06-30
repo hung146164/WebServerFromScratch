@@ -1,15 +1,3 @@
-#include "network/NetworkServer.h"
-#include "common/Json/JsonParser.h"
-#include "common/Json/JsonDocument.h"
-#include "common/Json/JsonNode.h"
-#include <chrono>
-#include "network/ServerConfig.h"
-#include "server/http/Router.h"
-#include "server/http/HttpResponse.h"
-#include "server/http/HttpStatic.h"
-#include "server/http/HttpUtils.h"
-#include "server/http/HttpMethod.h"
-
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -17,6 +5,19 @@
 #include <filesystem>
 #include <cstdio>
 #include <csignal>
+#include <chrono>
+#include <unistd.h>
+
+#include "network/NetworkServer.h"
+#include "common/Json/JsonParser.h"
+#include "common/Json/JsonDocument.h"
+#include "common/Json/JsonNode.h"
+#include "network/ServerConfig.h"
+#include "server/http/Router.h"
+#include "server/http/HttpResponse.h"
+#include "server/http/HttpStatic.h"
+#include "server/http/HttpUtils.h"
+#include "server/http/HttpMethod.h"
 
 NetworkServer *global_server = nullptr;
 
@@ -36,69 +37,41 @@ void signal_handler(int signal)
     }
 }
 
-void test_download_image(int fd, const HttpRequest &request)
+void view_handler(int fd, const HttpRequest &request)
 {
-    HttpRequest req_copy = request;
-    if (req_copy.http_url.rfind("/api/download_image", 0) == 0)
+    std::string_view url_to_serve = request.http_url;
+    if (url_to_serve.rfind("/api/view", 0) == 0)
     {
-        req_copy.http_url.remove_prefix(19);
+        url_to_serve.remove_prefix(9);
     }
-    if (req_copy.http_url.empty())
+    if (url_to_serve.empty())
     {
-        req_copy.http_url = "/";
+        url_to_serve = "/";
     }
+    Http::ServeFile(fd, request, url_to_serve, "www", true);
+}
 
-    std::string_view req_range = "";
-    auto it = req_copy.header.find("Range");
-    if (it != req_copy.header.end())
+void download_handler(int fd, const HttpRequest &request)
+{
+    std::string_view url_to_serve = request.http_url;
+    if (url_to_serve.rfind("/api/download", 0) == 0)
     {
-        req_range = it->second;
+        url_to_serve.remove_prefix(13);
     }
-    Http::ServeFile(fd, req_copy, "www", req_range);
+    if (url_to_serve.empty())
+    {
+        url_to_serve = "/";
+    }
+    Http::ServeFile(fd, request, url_to_serve, "www", false);
 }
 
 void fallback_test(int fd, const HttpRequest &request)
 {
-    std::string_view req_range = "";
-    auto it = request.header.find("Range");
-    if (it != request.header.end())
-    {
-        req_range = it->second;
-    }
-    Http::ServeFile(fd, request, "www", req_range);
+    Http::ServeFile(fd, request, request.http_url, "www", true);
 }
 
-// Handler minh họa mã hóa Payload ở tầng ứng dụng bằng RC4 tự viết
-void secure_data_handler(int fd, const HttpRequest &req)
-{
-    std::string body_data(req.body);
-
-    // Giải mã dữ liệu nhận được bằng thuật toán RC4
-    Http::RC4("VDTSecretKey", body_data);
-    std::cout << "[Secure API] Decrypted body: " << body_data << "\n";
-
-    // Chuẩn bị phản hồi JSON
-    std::string resp = "{\"status\":\"ok\",\"secret_received\":\"" + body_data + "\"}";
-
-    // Mã hóa phản hồi trước khi gửi về client
-    Http::RC4("VDTSecretKey", resp);
-
-    // Gửi phản hồi với header X-Encrypt báo hiệu cho client biết dữ liệu đã được mã hóa
-    std::ostringstream oss;
-    oss << "HTTP/1.1 200 OK\r\n"
-        << "Content-Type: application/octet-stream\r\n"
-        << "Content-Length: " << resp.size() << "\r\n"
-        << "X-Encrypt: true\r\n"
-        << "Connection: keep-alive\r\n\r\n"
-        << resp;
-    std::string response = oss.str();
-    send(fd, response.data(), response.size(), MSG_NOSIGNAL);
-}
-
-// Handler minh họa phân tích cú pháp và xử lý JSON (Thread-Local Arena Parser Demo)
 void parse_students_handler(int fd, const HttpRequest &req)
 {
-    // Cấp phát trước 1,000 nodes trên mỗi luồng (Size Guard chống DoS)
     thread_local Json::JsonParser parser(1000);
 
     try
@@ -203,32 +176,32 @@ void parse_students_handler(int fd, const HttpRequest &req)
 
 int main()
 {
+
     ServerConfig cfg;
     cfg.port = 8081;
     cfg.num_workers = 2;
 
-    // Đăng ký Route Tải File bằng Wildcard (Khớp mọi file nằm dưới đường dẫn này)
-    Http::Router::Register(HttpMethod::GET, "/api/download_image/*", test_download_image);
+    // API hiển thị/xem file trực tiếp
+    Http::Router::Register(HttpMethod::GET, "/api/view/*", view_handler);
 
-    // Đăng ký Route POST Upload File lên server
+    // API tải file về máy (attachment)
+    Http::Router::Register(HttpMethod::GET, "/api/download/*", download_handler);
+
+    // API upload
     Http::Router::Register(HttpMethod::POST, "/api/upload", Http::HandleFileUpload);
 
-    // Đăng ký Route POST dữ liệu bảo mật (Mã hóa RC4)
-    Http::Router::Register(HttpMethod::POST, "/api/secure_data", secure_data_handler);
-
-    // Đăng ký Route POST xử lý danh sách học sinh (JSON Parser demo)
+    // API parse json
     Http::Router::Register(HttpMethod::POST, "/api/parse_students", parse_students_handler);
 
-    // Phục vụ mọi file tĩnh khác qua Fallback tự động
+    // API Fallback
     Http::Router::RegisterFallback(fallback_test);
 
     NetworkServer server(cfg);
     global_server = &server;
 
-    // Đăng ký bắt các tín hiệu để tắt server sạch sẽ và nạp lại cấu hình
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
-    std::signal(SIGHUP, signal_handler); // Reload config.json không downtime
+    std::signal(SIGHUP, signal_handler);
     std::signal(SIGPIPE, SIG_IGN);
 
     server.Start();
