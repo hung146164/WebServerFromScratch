@@ -24,37 +24,6 @@
 namespace Http
 {
 
-    /// Lấy tham số Query String từ URL
-    /// URL: /api/students?class=12A&page=2
-    /// Http::QueryParam(req, "class") → "12A"
-    inline std::string_view QueryParam(const HttpRequest &req, std::string_view key)
-    {
-        std::string_view url = req.http_url;
-        auto qpos = url.find('?');
-        if (qpos == std::string_view::npos)
-            return {};
-
-        std::string_view query = url.substr(qpos + 1);
-        int start = 0;
-
-        while (start < query.size())
-        {
-            int amp = query.find('&', start);
-            std::string_view pair = (amp == std::string_view::npos)
-                                        ? query.substr(start)
-                                        : query.substr(start, amp - start);
-
-            int eq = pair.find('=');
-            if (eq != std::string_view::npos && pair.substr(0, eq) == key)
-                return pair.substr(eq + 1);
-
-            if (amp == std::string_view::npos)
-                break;
-            start = amp + 1;
-        }
-        return {};
-    }
-
     /// Lấy giá trị Header theo tên (không phân biệt hoa/thường)
     /// Http::GetHeader(req, "authorization") → "Bearer xyz"
     inline std::string_view GetHeader(const HttpRequest &req, std::string_view key)
@@ -79,69 +48,23 @@ namespace Http
         return {};
     }
 
-    /// Lấy giá trị Cookie theo tên
-    /// Cookie header: "session=abc; theme=dark"
-    /// Http::GetCookie(req, "session") → "abc"
-    inline std::string_view GetCookie(const HttpRequest &req, std::string_view name)
-    {
-        std::string_view cookie_hdr = GetHeader(req, "cookie");
-        if (cookie_hdr.empty())
-            return {};
-
-        int start = 0;
-        while (start < cookie_hdr.size())
-        {
-            // Bỏ khoảng trắng
-            while (start < cookie_hdr.size() && cookie_hdr[start] == ' ')
-                ++start;
-
-            int semi = cookie_hdr.find(';', start);
-            std::string_view pair = (semi == std::string_view::npos)
-                                        ? cookie_hdr.substr(start)
-                                        : cookie_hdr.substr(start, semi - start);
-
-            int eq = pair.find('=');
-            if (eq != std::string_view::npos && pair.substr(0, eq) == name)
-                return pair.substr(eq + 1);
-
-            if (semi == std::string_view::npos)
-                break;
-            start = semi + 1;
-        }
-        return {};
-    }
-
-    /// Lấy URL path không có query string
-    /// "/api/student?page=1" → "/api/student"
-    inline std::string_view GetPath(const HttpRequest &req)
-    {
-        std::string_view url = req.http_url;
-        auto qpos = url.find('?');
-        return (qpos == std::string_view::npos) ? url : url.substr(0, qpos);
-    }
-
-    // ─── Kiểm tra Content-Type ────────────────────────────────────────────────────
-
-    inline bool IsFormData(const HttpRequest &req)
-    {
-        return req.content_type.find("application/x-www-form-urlencoded") != std::string_view::npos;
-    }
-
-    inline bool IsMultipart(const HttpRequest &req)
-    {
-        return req.content_type.find("multipart/form-data") != std::string_view::npos;
-    }
-
     inline void HandleFileUpload(int fd, const HttpRequest &req)
     {
-        std::string upload_dir = "www/uploads";
+        /*
+            Tạo đường dẫn thư mục đích là "www/upload"
+            Gọi thư viện hệ thống để tự động tạo toàn bộ cây thư mục nếu nó chưa tồn tại
+        */
+        std::string upload_dir = "www/upload";
         std::error_code ec;
         std::filesystem::create_directories(upload_dir, ec);
 
+        /*
+            Khởi tạo
+        */
         std::string filename = "uploaded_file.bin";
         std::string_view file_data = req.body;
 
-        std::string_view ct = req.content_type;
+                std::string_view ct = req.content_type;
         auto boundary_pos = ct.find("boundary=");
         if (boundary_pos != std::string_view::npos)
         {
@@ -206,7 +129,8 @@ namespace Http
         }
 
         // Validate file extension matches what the server supports
-        auto IsSupportedExtension = [](std::string_view fn) -> bool {
+        auto IsSupportedExtension = [](std::string_view fn) -> bool
+        {
             auto pos = fn.rfind('.');
             if (pos == std::string_view::npos)
                 return false;
@@ -276,31 +200,6 @@ namespace Http
         return ret;
     }
 
-    inline void RC4(std::string_view key, std::string &data)
-    {
-        unsigned char S[256];
-        for (int i = 0; i < 256; ++i)
-            S[i] = i;
-
-        int j = 0;
-        for (int i = 0; i < 256; ++i)
-        {
-            j = (j + S[i] + static_cast<unsigned char>(key[i % key.size()])) % 256;
-            std::swap(S[i], S[j]);
-        }
-
-        int i = 0;
-        j = 0;
-        for (size_t k = 0; k < data.size(); ++k)
-        {
-            i = (i + 1) % 256;
-            j = (j + S[i]) % 256;
-            std::swap(S[i], S[j]);
-            unsigned char K = S[(S[i] + S[j]) % 256];
-            data[k] ^= K;
-        }
-    }
-
     inline void LogRequest(int worker_id, std::string_view client_ip, const HttpRequest &req, int status_code)
     {
         time_t now = time(nullptr);
@@ -345,10 +244,7 @@ namespace Http
 
         // Construct the log line as a single string to print atomically to std::cout,
         // avoiding interleaved logs from concurrent worker threads.
-        std::string log_line = "[INFO] [" + std::string(time_str) + "] [Worker " + std::to_string(worker_id) + "] "
-                               + method_str + " " + std::string(req.http_url) + " -> "
-                               + std::to_string(status_code) + " " + status_msg 
-                               + " (IP: " + std::string(client_ip) + ")\n";
+        std::string log_line = "[INFO] [" + std::string(time_str) + "] [Worker " + std::to_string(worker_id) + "] " + method_str + " " + std::string(req.http_url) + " -> " + std::to_string(status_code) + " " + status_msg + " (IP: " + std::string(client_ip) + ")\n";
         std::cout << log_line;
     }
 
