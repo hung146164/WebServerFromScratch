@@ -152,3 +152,15 @@ Công cụ giả lập hành vi người dùng thật (đọc tin tức, tải f
    locust -f locustfile.py
    ```
 3. Truy cập `http://localhost:8089` trên trình duyệt, điền thông số Users (ví dụ: 1000) và Host là `http://localhost:8081` để bắt đầu swarming.
+
+### Cách 3: Kiểm thử Trực Tiếp trên Giao Diện Web (Web UI Testing)
+Sau khi khởi chạy Web Server, bạn có thể thực hiện kiểm nghiệm trực quan tất cả các tính năng thông qua giao diện Web thân thiện:
+
+1. **Truy cập Giao diện**: Mở trình duyệt web của bạn và truy cập địa chỉ:
+   ```text
+   http://127.0.0.1:8081/
+   ```
+2. **Kiểm thử các Tính năng**:
+   * **Tải tệp tin (Download File)**: Click vào các liên kết tải xuống PDF hoặc JPG để kiểm tra cơ chế truyền dẫn `sendfile` Zero-copy của máy chủ.
+   * **Tải lên tệp tin (Upload File)**: Kéo thả một tệp bất kỳ (hình ảnh, tài liệu) vào vùng tải lên và nhấn nút Upload. Server sẽ bóc tách dữ liệu Multipart, lưu file vào thư mục `www/upload/` và phản hồi trạng thái thành công.
+   * **Phân tích cú pháp JSON (JSON Parser)**: Nhập dữ liệu JSON học sinh vào ô văn bản, nhấn nút Submit. Máy chủ sẽ chuyển dữ liệu tới API `/api/parse_students`, sử dụng bộ phân tích cú pháp JSON tối ưu hóa bằng Memory Pool để bóc tách thông tin và hiển thị kết quả trực tiếp lên giao diện.
