@@ -91,6 +91,36 @@ Từ thư mục gốc dự án, chạy lệnh:
 
 ---
 
+## 🧪 Cơ chế Xác Thực & Hệ thống Kiểm thử Tự động (Testing & Verification)
+
+Dự án triển khai một quy trình kiểm thử nghiêm ngặt nhằm xác minh tính chính xác tuyệt đối của mã nguồn xử lý I/O và Parser (không chỉ dừng lại ở việc chạy thử không lỗi mà phải xác thực ngữ nghĩa dữ liệu).
+
+### 1. Kiểm thử Toàn vẹn Ngữ nghĩa JSON (JSON Parser Validation)
+Để xác nhận bộ phân tích cú pháp JSON tự viết bằng C++ (sử dụng Arena Allocator) có khả năng parse chính xác 100% cấu trúc dữ liệu tải nặng mà không bị mất dữ liệu hay lỗi logic:
+
+* **Bước 1: Sinh dữ liệu biên (Edge Cases) bằng Python:**
+  Chương trình [sinhtest.py](tests/json/sinhtest.py) tự động tạo file `large_test.json` (50MB) chứa hàng chục ngàn đối tượng ngẫu nhiên chứa các trường hợp bẫy hệ thống:
+  * Tràn số nguyên: `INT64_MAX` và `INT64_MIN`.
+  * Ký tự đặc biệt (Escape sequence): Các ký tự `\n`, `\t`, `\"`, `\\`.
+  * Emojis và ký tự Unicode phức tạp.
+  * Cấu trúc lồng sâu 5 cấp (Deep array/object nesting).
+* **Cơ chế tính toán Checksum:**
+  Trong quá trình sinh file, script Python tính toán cộng dồn giá trị định danh của toàn bộ các đối tượng được ghi ra:
+  $$\text{Expected Checksum} = \sum_{i=3}^{N-1} \text{obj\_id}_i$$
+* **Bước 2: Đối chiếu chéo bằng C++ (`testjson`):**
+  Khi chạy `./build/tests/json/testjson`, chương trình C++ nạp file JSON, parse thành cây DOM, duyệt qua toàn bộ cây để tính toán lại Checksum và đếm số phần tử.
+  * **Xác thực thành công:** Chương trình so sánh `Calculated Checksum` thu được từ Parser C++ với `Expected Checksum` từ Python. Nếu trùng khớp, in ra thông báo: `[+] PASSED: Toan ven du lieu duoc xac nhan!`.
+  * Điều này đảm bảo Parser đã đọc đúng từng thuộc tính, từng ký tự và không bỏ sót bất kỳ node nào trong file 50MB.
+
+### 2. Kiểm thử Bộ phân tích cú pháp HTTP (HTTP Parser Unit Tests)
+Tệp tin [test_HttpParser.cpp](tests/http/test_HttpParser.cpp) thực hiện kiểm thử hộp trắng (White-box testing) đối với lớp `HttpRequest` nhằm xác nhận:
+* **Tách dòng Request Line**: Phân tích đúng phương thức (GET/POST), đường dẫn URL và phiên bản HTTP (HTTP/1.1).
+* **Cắt khoảng trắng Header**: Xác nhận các ký tự khoảng trắng thừa trước và sau khóa/giá trị của Header được loại bỏ chính xác (ví dụ: `Host:  localhost ` -> key: `Host`, val: `localhost`).
+* **TCP Stream Compaction**: Kiểm thử xem khi bộ đệm dính gói TCP (chứa dữ liệu của request tiếp theo), hàm `std::memmove` có di chuyển vùng nhớ dính gói về đầu đệm và reset chính xác máy trạng thái FSM để chuẩn bị nhận request kế tiếp hay không.
+* **Cách chạy:** Thực thi trực tiếp file biên dịch `./build/tests/http/testhttp`.
+
+---
+
 ## 📈 Hướng dẫn Chạy Kiểm Thử Hiệu Năng (Benchmark)
 
 ### Cách 1: Kiểm thử bằng Apache Benchmark (Lệnh ab) - Khuyên dùng để đo Max Speed
