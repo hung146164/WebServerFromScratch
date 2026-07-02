@@ -19,15 +19,4 @@ set(SOURCES
 add_executable(webserver ${SOURCES})
 
 add_subdirectory(tests/json)
-
-# HTTP Server Logic Unit Tests
-find_package(Threads REQUIRED)
-set(HTTP_TEST_SOURCES
-    tests/http/test_HttpParser.cpp
-    src/server/http/HttpRequest.cpp
-    src/server/http/Router.cpp
-    src/common/Json/JsonDocument.cpp
-    src/common/Json/JsonParser.cpp
-)
-add_executable(run_http_tests ${HTTP_TEST_SOURCES})
-target_link_libraries(run_http_tests PRIVATE Threads::Threads)
+add_subdirectory(tests/http)
