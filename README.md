@@ -19,14 +19,14 @@ Dự án xây dựng một Web Server hiệu năng cao viết bằng ngôn ngữ
 ## 📁 Cấu trúc thư mục
 
 * `src/`: Mã nguồn triển khai lớp Server, Worker, Router và Parser.
-* `include/`: Các tệp tin tiêu đề khai báo lớp và hàm tiện ích HTTP.
+* `include/`: Các tệp tin tiêu đề cấu trúc HTTP.
 * `www/`: Thư mục chứa tài nguyên tĩnh phục vụ web:
   * `www/view/`: Chứa các trang web tĩnh (`index.html`, `style.css`...) phục vụ hiển thị.
   * `www/download/`: Chứa các file tài liệu và ảnh để tải về.
   * `www/upload/`: Thư mục lưu trữ các file client tải lên.
 * `locustfile.py`: Kịch bản kiểm thử hiệu năng bằng Locust.
 
-## 🛠️ Hướng dẫn Biên dịch & Chạy Server
+## 🛠️ Hướng dẫn Biên dịch & Cấu hình Hệ thống
 
 ### 1. Yêu cầu hệ thống
 * Hệ điều hành Linux (Ubuntu/Debian) hoặc WSL2.
@@ -34,38 +34,91 @@ Dự án xây dựng một Web Server hiệu năng cao viết bằng ngôn ngữ
 * CMake (3.10 trở lên) và Make.
 
 ### 2. Biên dịch dự án (Release Mode với tối ưu hóa -O3)
+Thực hiện chạy CMake và Make bên trong thư mục `build`:
 ```bash
 mkdir -p build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
-make
+make -j$(nproc)
 ```
 
-### 3. Cấu hình hệ thống & Khởi chạy
-Trước khi chạy, nâng giới hạn số lượng File Descriptor của tiến trình để phục vụ tải cao:
+### 3. Sinh các tệp tin dữ liệu nặng để phục vụ kiểm thử
+Vì các file lớn được khai báo trong `.gitignore` để tránh đẩy lên Git, bạn cần tự sinh nhanh các tệp tin này bằng các lệnh sau trước khi chạy test:
 ```bash
+# Trở về thư mục gốc của dự án
+cd ..
+
+# Đảm bảo thư mục lưu trữ upload tồn tại
+mkdir -p www/upload
+
+# Sinh file test 50MB (chỉ mất 0.1s)
+truncate -s 50M www/download/heavy_file.bin
+
+# Sinh file test 1.5GB (chỉ mất 0.1s)
+truncate -s 1500M www/download/heavy_1.5gb.bin
+```
+
+### 4. Tùy chỉnh cấu hình trong tệp `config.json`
+Tệp cấu hình [config.json](config.json) nằm ở thư mục gốc của dự án. Bạn có thể tự do chỉnh sửa các thông số hiệu năng trước khi khởi chạy Server:
+* **port**: Cổng mạng Server lắng nghe (mặc định: `8081`).
+* **num_workers**: Số lượng luồng xử lý (Reactor threads).
+* **client_per_worker**: Số lượng kết nối tối đa mỗi luồng quản lý (LRU Cache Size).
+* **read_timeout_sec**: Thời gian chờ ngắt kết nối không hoạt động (idle timeout).
+* **rate_limit_per_sec**: Giới hạn số lượng request tối đa/giây từ một địa chỉ IP.
+
+### 5. Cấu hình giới hạn hệ thống để chịu tải tối đa (Ulimit)
+Để Server không bị lỗi từ chối kết nối khi chịu tải hàng ngàn users đồng thời, bạn cần mở khóa giới hạn cổng mạng và số lượng tệp mở của Linux:
+```bash
+# Nâng giới hạn file descriptor cho tiến trình ở terminal hiện tại
 ulimit -n 65535
+
+# Tối ưu hóa hàng đợi kết nối của nhân hệ điều hành Linux (Yêu cầu quyền sudo)
+sudo sysctl -w net.core.somaxconn=65535
+sudo sysctl -w net.ipv4.tcp_max_syn_backlog=65535
 ```
-Khởi chạy Server (mặc định chạy cổng `8081`):
+
+### 6. Khởi chạy Server
+> ⚠️ **QUAN TRỌNG:** Phải khởi chạy file thực thi từ **thư mục gốc của dự án** (không chạy bên trong thư mục `build`) để Server có thể định vị chính xác đường dẫn tương đối của tệp cấu hình `config.json` và thư mục tài nguyên tĩnh `www/`.
+
+Từ thư mục gốc dự án, chạy lệnh:
 ```bash
-# Khởi chạy kèm hiển thị log
-./webserver
+# Khởi chạy hiển thị log bình thường
+./build/webserver
 
-# Hoặc khởi chạy tối ưu hóa hiệu năng (hủy in log console để tránh nghẽn I/O)
-./webserver > /dev/null
+# Hoặc khởi chạy tối ưu hóa (hủy in log console để tránh nghẽn I/O khi test tải)
+./build/webserver > /dev/null 2>&1
 ```
 
-## 📈 Hướng dẫn Kiểm thử hiệu năng (Locust)
+---
 
-Kịch bản kiểm thử Locust được viết sẵn để đo lường hiệu năng đồng thời của 9 API chính (từ tải file, xem file, upload cho đến parse JSON).
+## 📈 Hướng dẫn Chạy Kiểm Thử Hiệu Năng (Benchmark)
 
-### Chạy Locust:
-1. Cài đặt Locust:
+### Cách 1: Kiểm thử bằng Apache Benchmark (Lệnh ab) - Khuyên dùng để đo Max Speed
+Công cụ `ab` rất gọn nhẹ và đo đạc cực kỳ chuẩn xác tốc độ xử lý mạng thô.
+
+1. Cài đặt `ab` trên Linux/WSL2:
+   ```bash
+   sudo apt update && sudo apt install -y apache2-utils
+   ```
+2. Chạy test tải file PDF 650KB (Giả lập 100 người tải đồng thời, tổng 1000 lượt tải):
+   ```bash
+   ab -k -c 100 -n 1000 http://127.0.0.1:8081/api/download/222.pdf
+   ```
+   *(Lưu ý: Bắt buộc phải có cờ `-k` để kích hoạt cơ chế Keep-Alive tương thích với nhân Web Server).*
+3. Chạy test tải file 1.5GB khổng lồ (Giả lập 100 người tải đồng thời cùng lúc):
+   ```bash
+   ab -k -c 100 -n 100 http://127.0.0.1:8081/api/download/heavy_1.5gb.bin
+   ```
+
+### Cách 2: Kiểm thử bằng Locust (Giao diện Web UI)
+Công cụ giả lập hành vi người dùng thật (đọc tin tức, tải file, gửi JSON học sinh ngẫu nhiên).
+
+1. Cài đặt Locust (Yêu cầu máy đã cài Python):
    ```bash
    pip install locust
    ```
-2. Chạy Locust chỉ định file kịch bản:
+2. Khởi chạy Locust:
    ```bash
    locust -f locustfile.py
    ```
-3. Truy cập `http://localhost:8089` trên trình duyệt để bắt đầu swarming.
+3. Truy cập `http://localhost:8089` trên trình duyệt, điền thông số Users (ví dụ: 1000) và Host là `http://localhost:8081` để bắt đầu swarming.
