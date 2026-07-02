@@ -73,7 +73,8 @@ namespace Http
         return "application/octet-stream";
     }
 
-    inline void ServeFile(int fd, const HttpRequest &req, std::string_view url_to_serve, std::string_view web_root, bool inline_view)
+    inline void ServeFile(int fd, const HttpRequest &req, std::string_view url_to_serve,
+                          std::string_view web_root, bool inline_view)
     {
         std::string decoded_url = Http::UrlDecode(url_to_serve);
         std::string_view url_path = decoded_url;
@@ -159,6 +160,7 @@ namespace Http
         header += "\r\n";
 
         // ---- Thiết lập Content-Disposition theo cờ inline_view ----
+        // Trình duyệt sẽ biết nếu Content-Disposition: attachment nó sẽ tự động tải file
         if (inline_view)
         {
             header += "Content-Disposition: inline\r\n";
@@ -173,7 +175,7 @@ namespace Http
         header += "Access-Control-Allow-Origin: *\r\nConnection: keep-alive\r\n\r\n";
         send(fd, header.data(), header.size(), MSG_NOSIGNAL);
 
-        // Thiết lập trạng thái gửi file ngầm, không tự gửi đồng bộ nữa
+        // Thiết lập trạng thái gửi file ngầm, thông qua cờ epoll out của worker
 
         req.is_sending_file = true;
         req.file_fd = file_fd;

@@ -47,7 +47,6 @@
       <nav>
         <a href="index.html">Dashboard</a>
         <a href="test_features.html" class="active">Tính năng</a>
-        <a href="test_benchmark.html">Hiệu năng</a>
       </nav>
     </header>
 
@@ -252,7 +251,7 @@
           const errMsg = json ? json.error : 'Không rõ nguyên nhân';
           logToConsole(`Upload thất bại! Mã HTTP: ${res.status}. Chi tiết: ${errMsg}`, 'error');
           document.getElementById('upload-status').innerHTML = `
-            <span style="color:var(--error); font-weight:bold;">Thành công (HTTP ${res.status})!</span><br>
+            <span style="color:var(--error); font-weight:bold;">Thất bại (HTTP ${res.status})!</span><br>
             <strong>Lỗi:</strong> ${errMsg}
           `;
         }

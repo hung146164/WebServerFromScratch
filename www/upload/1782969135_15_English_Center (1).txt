@@ -1,0 +1,472 @@
+﻿CREATE DATABASE English_Center;
+GO
+USE English_Center;
+GO
+-- ============================================================
+--  NHÓM 1: QUẢN LÝ TÀI KHOẢN & VAI TRÒ
+-- ============================================================
+
+CREATE TABLE NGUOI_DUNG (
+    nguoi_dung_id       INT IDENTITY(1,1)   PRIMARY KEY,
+    ho_ten              NVARCHAR(100)       NOT NULL,
+    can_cuoc_cong_dan   VARCHAR(12)         NOT NULL UNIQUE, 
+    username            VARCHAR(100)        NOT NULL UNIQUE, 
+    email               VARCHAR(150)        NOT NULL UNIQUE, 
+    mat_khau_hash       VARCHAR(255)        NOT NULL,
+    vai_tro             VARCHAR(20)         NOT NULL,
+    so_dien_thoai       VARCHAR(15),
+    dia_chi             NVARCHAR(255),
+    ngay_sinh           DATE                NOT NULL,
+    anh_dai_dien        VARCHAR(255),
+    public_url_id       VARCHAR(100),
+    lan_dang_nhap_cuoi  DATETIME2,
+    tao_luc             DATETIME2           NOT NULL DEFAULT GETDATE(),
+    cap_nhat_luc        DATETIME2           NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT ck_nd_vai_tro    CHECK (vai_tro IN ('ADMIN','GIAO_VIEN','HOC_SINH','PHU_HUYNH'))
+);
+GO
+sp_help nguoi_dung
+
+CREATE TABLE GIAO_VIEN (
+    giao_vien_id        INT IDENTITY(1,1)   PRIMARY KEY,
+    nguoi_dung_id       INT                 NOT NULL UNIQUE,
+    ma_giao_vien        VARCHAR(100)        NOT NULL UNIQUE,
+    ngay_vao_lam        DATE,
+    dang_lam_viec       BIT                 NOT NULL DEFAULT 1,
+    ghi_chu             NVARCHAR(MAX),
+    mo_ta_giao_vien     NVARCHAR(2000),
+    so_kinh_nghiem      NVARCHAR(50),
+    so_tai_khoan        VARCHAR(16),
+    ten_ngan_hang       NVARCHAR(80),
+    ma_qr_ngan_hang     VARCHAR(255),
+    CONSTRAINT fk_gv_nguoidung  FOREIGN KEY (nguoi_dung_id) REFERENCES NGUOI_DUNG(nguoi_dung_id) ON DELETE CASCADE
+);
+
+GO
+sp_help giao_vien
+
+CREATE TABLE GIAO_VIEN_CHUNG_CHI (
+    giao_vien_chung_chi_id INT IDENTITY(1, 1) PRIMARY KEY, 
+    giao_vien_id           INT                 NOT NULL,
+    certificate_name       VARCHAR(100)        NOT NULL,
+    total_score            DECIMAL(4, 1),
+    reading_score          DECIMAL(4, 1),
+    writing_score          DECIMAL(4, 1),
+    listening_score        DECIMAL(4, 1),
+    speaking_score         DECIMAL(4, 1),
+    minh_chung             VARCHAR(255),
+    public_url_id          VARCHAR(100),
+    
+    CONSTRAINT fk_gv_cert FOREIGN KEY (giao_vien_id) REFERENCES GIAO_VIEN(giao_vien_id) ON DELETE CASCADE
+);
+GO
+
+CREATE TABLE HOC_SINH (
+    hoc_sinh_id         INT IDENTITY(1,1)   PRIMARY KEY,
+    ma_hoc_sinh         VARCHAR(100)        NOT NULL UNIQUE,
+    nguoi_dung_id       INT                 NOT NULL UNIQUE,
+    truong_hoc          NVARCHAR(255)       NOT NULL,
+    lop                 VARCHAR(25),
+    ghi_chu             NVARCHAR(MAX),
+    
+    CONSTRAINT fk_hs_nguoidung  FOREIGN KEY (nguoi_dung_id) REFERENCES NGUOI_DUNG(nguoi_dung_id) ON DELETE CASCADE
+);
+
+GO
+
+CREATE TABLE PHU_HUYNH (
+    phu_huynh_id        INT IDENTITY(1,1)   PRIMARY KEY,
+    ma_phu_huynh        VARCHAR(100)        NOT NULL UNIQUE,
+    nguoi_dung_id       INT                 NOT NULL UNIQUE,
+    nghe_nghiep         NVARCHAR(100),
+    ghi_chu             NVARCHAR(MAX),
+    CONSTRAINT fk_ph_nguoidung  FOREIGN KEY (nguoi_dung_id) REFERENCES NGUOI_DUNG(nguoi_dung_id) ON DELETE CASCADE
+);
+GO
+
+CREATE TABLE PHU_HUYNH_HOC_SINH (
+    phu_huynh_id            INT     NOT NULL,
+    hoc_sinh_id             INT     NOT NULL,
+    quan_he                 VARCHAR(20) NOT NULL,
+    la_nguoi_lien_he_chinh  BIT     NOT NULL DEFAULT 0,
+
+    CONSTRAINT pk_phhs              PRIMARY KEY (phu_huynh_id, hoc_sinh_id),
+    CONSTRAINT ck_phhs_quan_he     CHECK (quan_he IN (N'Cha', N'Mẹ', N'Ông', N'Bà', N'Người giám hộ')),
+    CONSTRAINT fk_phhs_phu_huynh    FOREIGN KEY (phu_huynh_id) REFERENCES PHU_HUYNH(phu_huynh_id),
+    CONSTRAINT fk_phhs_hoc_sinh     FOREIGN KEY (hoc_sinh_id) REFERENCES HOC_SINH(hoc_sinh_id)  
+);
+GO
+
+-- 1. Bảng yêu cầu đăng ký cha
+CREATE TABLE YEU_CAU_DANG_KY (
+    dang_ky_id          INT IDENTITY(1,1)   PRIMARY KEY,
+    ho_ten              NVARCHAR(100)       NOT NULL,
+    can_cuoc_cong_dan   VARCHAR(12)         NOT NULL 
+    email               VARCHAR(150)        NOT NULL
+    so_dien_thoai       VARCHAR(15)         NOT NULL,
+    dia_chi             NVARCHAR(255),
+    ngay_sinh           DATE                NOT NULL,
+    vai_tro             VARCHAR(20)         NOT NULL,
+    ngay_gui            DATETIME2           NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT ck_ycdk_vai_tro  CHECK (vai_tro IN ('GIAO_VIEN','HOC_SINH','PHU_HUYNH'))
+);
+GO 
+-- 2. Yêu cầu chi tiết cho Học Sinh
+CREATE TABLE YEU_CAU_HOC_SINH (
+    dang_ky_id          INT                 PRIMARY KEY,
+    truong_hoc          NVARCHAR(255)       NOT NULL,
+    lop                 VARCHAR(25),
+    ghi_chu             NVARCHAR(MAX),
+    
+    CONSTRAINT fk_ychs_dangky FOREIGN KEY (dang_ky_id) REFERENCES YEU_CAU_DANG_KY(dang_ky_id) ON DELETE CASCADE
+);
+GO 
+-- 3. Yêu cầu chi tiết cho Phụ Huynh
+CREATE TABLE YEU_CAU_PHU_HUYNH (
+    dang_ky_id          INT                 PRIMARY KEY,
+    nghe_nghiep         NVARCHAR(100),
+    ghi_chu             NVARCHAR(MAX),
+    
+    CONSTRAINT fk_ycph_dangky FOREIGN KEY (dang_ky_id) REFERENCES YEU_CAU_DANG_KY(dang_ky_id) ON DELETE CASCADE
+);
+GO 
+-- 4. Yêu cầu chi tiết cho Giáo Viên
+CREATE TABLE YEU_CAU_GIAO_VIEN (
+    dang_ky_id          INT                 PRIMARY KEY,
+    mo_ta_giao_vien     NVARCHAR(2000),
+    so_kinh_nghiem      NVARCHAR(50),
+    so_tai_khoan        VARCHAR(16),
+    ten_ngan_hang       NVARCHAR(80),
+    ghi_chu             NVARCHAR(MAX),
+    
+    CONSTRAINT fk_ycgv_dangky FOREIGN KEY (dang_ky_id) REFERENCES YEU_CAU_DANG_KY(dang_ky_id) ON DELETE CASCADE
+);
+GO 
+-- Chứng chỉ đi kèm yêu cầu của Giáo Viên
+CREATE TABLE YEU_CAU_GIAO_VIEN_CHUNG_CHI (
+    yc_chung_chi_id     INT IDENTITY(1, 1)  PRIMARY KEY,
+    dang_ky_id          INT                 NOT NULL,
+    certificate_name    VARCHAR(100)        NOT NULL,
+    total_score         DECIMAL(4, 1),
+    reading_score       DECIMAL(4, 1),
+    writing_score       DECIMAL(4, 1),
+    listening_score     DECIMAL(4, 1),
+    speaking_score      DECIMAL(4, 1),
+    minh_chung          VARCHAR(255),
+    public_url_id       VARCHAR(100),
+    
+    CONSTRAINT fk_ycccc_gv FOREIGN KEY (dang_ky_id) REFERENCES YEU_CAU_GIAO_VIEN(dang_ky_id) ON DELETE CASCADE
+);
+GO 
+
+-- ============================================================
+--  NHÓM 2: NĂM HỌC & CẤU TRÚC LỚP
+-- ============================================================
+
+CREATE TABLE NAM_HOC (
+    nam_hoc_id          INT IDENTITY(1,1)   PRIMARY KEY, -- Đổi từ id
+    nam                 INT                 NOT NULL,
+    CONSTRAINT uq_namhoc_nam    UNIQUE (nam),
+);
+GO
+
+CREATE TABLE DO_TUOI (
+    do_tuoi_id          INT IDENTITY(1,1)   PRIMARY KEY, 
+    tuoi_tu             INT                 NOT NULL,
+    tuoi_den            INT                 NOT NULL,
+
+    CONSTRAINT ck_dotuoi_tuoi   CHECK  (tuoi_den > tuoi_tu AND tuoi_tu >= 0)
+);
+GO
+
+CREATE TABLE LOP_HOC (
+    lop_hoc_id            INT IDENTITY(1,1)   PRIMARY KEY,
+    do_tuoi_id            INT                 NOT NULL,
+    nam_hoc_id            INT                 NOT NULL,
+    ten_lop               VARCHAR(30)         NOT NULL,
+    si_so_toi_da          INT,                not null default 0,
+
+    hoc_phi_chuan         DECIMAL(12,2)       NOT NULL,
+    trang_thai            VARCHAR(20)         NOT NULL DEFAULT 'sap_mo',
+    mo_ta               NVARCHAR(MAX),
+    so_buoi_toi_da        INT                 NOT NULL DEFAULT 0,
+    si_so_thuc_te         INT                 NOT NULL DEFAULT 0,
+
+    ngay_mo_dang_ky       DATE                NULL,
+    ngay_dong_dang_ky     DATE                NULL,
+    
+    ngay_bat_dau_khoa_hoc      DATE                NULL, 
+    ngay_ket_thuc_khoa_hoc DATE                NULL,
+
+    is_deleted bit default 0,
+
+    CONSTRAINT ck_lophoc_trang_thai CHECK (trang_thai IN ('sap_mo','dang_mo','da_dong')),
+    CONSTRAINT ck_lophoc_siso   CHECK  (si_so_toi_da >= 0),
+    CONSTRAINT ck_lophoc_buoi   CHECK  (so_buoi_moi_tuan >= 1),
+    CONSTRAINT ck_lophoc_phi    CHECK  (hoc_phi_chuan >= 0),
+    CONSTRAINT ck_lophoc_sobuoi CHECK (so_buoi_toi_da >= 0),
+    CONSTRAINT ck_lophoc_sisothucte CHECK (si_so_thuc_te >= 0),
+
+);
+GO
+sp_help lop_hoc
+alter table lop_hoc add   gio_ket_thuc          TIME
+
+CREATE TABLE PHAN_CONG_GV (
+    phan_cong_gv_id     INT IDENTITY(1,1)   PRIMARY KEY, -- Đổi từ id
+    lop_hoc_id          INT                 NOT NULL,
+    giao_vien_id        INT                 NOT NULL,
+    luong_theo_lop      DECIMAL(12,2)       NULL,  
+
+    CONSTRAINT ck_pcgv_ngay     CHECK (ngay_ket_thuc IS NULL OR ngay_ket_thuc >= ngay_bat_dau),
+    CONSTRAINT fk_pcgv_lophoc   FOREIGN KEY (lop_hoc_id) REFERENCES LOP_HOC(lop_hoc_id),  
+    CONSTRAINT fk_pcgv_giaovien FOREIGN KEY (giao_vien_id) REFERENCES GIAO_VIEN(giao_vien_id) 
+);
+GO
+
+-- ============================================================
+--  NHÓM 3: ĐĂNG KÝ HỌC
+-- ============================================================
+
+CREATE TABLE DANG_KY_HOC (
+    dang_ky_id          INT IDENTITY(1,1)   PRIMARY KEY, 
+    hoc_sinh_id         INT                 NOT NULL,
+    lop_hoc_id          INT                 NOT NULL,
+    ngay_dang_ky        DATE                NOT NULL,
+    he_so_giam          DECIMAL(5,2)        NOT NULL DEFAULT 0.00,
+    ly_do_giam          NVARCHAR(200)       NOT NULL,
+    CONSTRAINT uq_dangky        UNIQUE (hoc_sinh_id, lop_hoc_id),
+    CONSTRAINT ck_dangky_giam   CHECK  (he_so_giam >= 0 AND he_so_giam <= 100),
+
+    CONSTRAINT fk_dangky_hs     FOREIGN KEY (hoc_sinh_id) REFERENCES HOC_SINH(hoc_sinh_id),
+    CONSTRAINT fk_dangky_lh     FOREIGN KEY (lop_hoc_id) REFERENCES LOP_HOC(lop_hoc_id)   
+);
+GO
+sp_help dang_ky_hoc
+
+-- ============================================================
+--  NHÓM 4: BUỔI HỌC & ĐIỂM DANH
+-- ============================================================
+
+CREATE TABLE BUOI_HOC (
+    buoi_hoc_id     INT IDENTITY(1,1)   PRIMARY KEY, 
+    lop_hoc_id      INT                 NOT NULL,
+    giao_vien_id    INT,
+    ngay_hoc        DATE                NOT NULL,
+    gio_bat_dau           TIME, 
+    gio_ket_thuc          TIME,
+
+    da_dien_ra      BIT                 NOT NULL DEFAULT 0,
+    mo_ta         NVARCHAR(MAX),
+
+    CONSTRAINT fk_bh_lophoc     FOREIGN KEY (lop_hoc_id) REFERENCES LOP_HOC(lop_hoc_id),   
+    CONSTRAINT fk_bh_giaovien   FOREIGN KEY (giao_vien_id) REFERENCES GIAO_VIEN(giao_vien_id) 
+);
+GO
+
+CREATE TABLE DIEM_DANH (
+    diem_danh_id    INT IDENTITY(1,1)   PRIMARY KEY, -- Đổi từ id
+    buoi_hoc_id     INT                 NOT NULL,
+    hoc_sinh_id     INT                 NOT NULL,
+    trang_thai      VARCHAR(30)         NOT NULL,
+    ly_do_vang      NVARCHAR(MAX),
+    giao_vien_id INT,
+    ghi_luc         DATETIME2           NOT NULL DEFAULT GETDATE(),
+
+    CONSTRAINT uq_diemdanh      UNIQUE (buoi_hoc_id, hoc_sinh_id),
+    CONSTRAINT ck_dd_trang_thai CHECK (trang_thai IN ('co_mat','vang')),
+);
+GO
+
+
+CREATE TABLE REFRESH_TOKEN (
+    refresh_token_id INT IDENTITY(1,1)   PRIMARY KEY, -- Đổi từ id
+    nguoi_dung_id    INT                 NOT NULL,
+    refresh_token    VARCHAR(500)        NOT NULL,
+    ngay_het_han     DATETIME2           NOT NULL,
+    da_thu_hoi       BIT                 NOT NULL DEFAULT 0, 
+    tao_luc          DATETIME2           NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT uq_rt_token      UNIQUE (refresh_token),
+    CONSTRAINT fk_rt_nguoidung  FOREIGN KEY (nguoi_dung_id) REFERENCES NGUOI_DUNG(nguoi_dung_id) ON DELETE CASCADE
+);
+GO
+
+
+CREATE TABLE BLACKLIST_ACCESS_TOKEN (
+    blacklist_token_id INT IDENTITY(1,1) PRIMARY KEY, 
+    token_id           VARCHAR(36)       NOT NULL,
+    ngay_het_han       DATETIME2         NOT NULL, 
+    tao_luc            DATETIME2         NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT uq_bat_token UNIQUE (token_id)
+);
+GO
+
+-- ============================================================
+--  NHÓM 5: HỌC PHÍ
+-- ============================================================
+
+CREATE TABLE HOC_PHI (
+    hoc_phi_id     INT IDENTITY(1,1)   PRIMARY KEY, -- Đổi từ id
+    dang_ky_id        INT                 NOT NULL,
+    tien_da_dong      DECIMAL(12,2)       NOT NULL DEFAULT 0,
+    trang_thai        VARCHAR(20)         NOT NULL DEFAULT 'chua_dong',
+    tao_luc           DATETIME2           NOT NULL DEFAULT GETDATE(),
+    cap_nhat_luc      DATETIME2           NOT NULL DEFAULT GETDATE(),
+
+    CONSTRAINT fk_hpk_dangky        FOREIGN KEY (dang_ky_id) REFERENCES DANG_KY_HOC(dang_ky_id) 
+);
+GO
+
+CREATE TABLE LUOT_THU_PHI (
+    luot_thu_phi_id     INT IDENTITY(1,1)   PRIMARY KEY, -- Đổi từ id
+    hoc_phi_id       INT                 NOT NULL,
+    so_tien             DECIMAL(12,2)       NOT NULL,
+    thoi_gian  datatime not null
+    hinh_thuc           VARCHAR(20)         NOT NULL DEFAULT 'tien_mat',
+    nguoi_thu           INT,
+    ghi_chu             NVARCHAR(MAX),
+    tao_luc             DATETIME2           NOT NULL DEFAULT GETDATE(),
+
+    CONSTRAINT ck_ltf_sotien    CHECK (so_tien > 0),
+    CONSTRAINT ck_ltf_hinh_thuc CHECK (hinh_thuc IN ('tien_mat','chuyen_khoan')),
+    CONSTRAINT fk_ltf_hpk       FOREIGN KEY (hoc_phi_id) REFERENCES HOC_PHI(hoc_phi_id),
+    CONSTRAINT fk_ltf_nguoithu  FOREIGN KEY (nguoi_thu) REFERENCES NGUOI_DUNG(nguoi_dung_id)  
+);
+GO
+
+CREATE TABLE THANH_TOAN_GV (
+    thanh_toan_gv_id    INT IDENTITY(1,1)   PRIMARY KEY, 
+    lop_hoc_id 
+    giao_vien_id        INT                 NOT NULL,
+    thoi_gian  datatime not null
+    so_buoi_da_day      INT                 NOT NULL DEFAULT 0,
+    don_gia_ca_day      DECIMAL(12,2)       NOT NULL, 
+    tong_tien           DECIMAL(12,2)       NOT NULL,
+    ngay_thanh_toan     DATE,
+    nguoi_duyet         INT,
+    ghi_chu             NVARCHAR(MAX),
+    tao_luc             DATETIME2           NOT NULL DEFAULT GETDATE(),
+    
+
+    CONSTRAINT uq_ttgv              UNIQUE (giao_vien_id, thang, nam),
+    CONSTRAINT ck_ttgv_thang        CHECK  (thang BETWEEN 1 AND 12),
+    CONSTRAINT ck_ttgv_tong_tien    CHECK  (tong_tien >= 0),
+    CONSTRAINT ck_ttgv_don_gia      CHECK  (don_gia_ca_day >= 0),
+    CONSTRAINT fk_ttgv_giaovien     FOREIGN KEY (giao_vien_id) REFERENCES GIAO_VIEN(giao_vien_id),
+    CONSTRAINT fk_ttgv_nguoiduyet   FOREIGN KEY (nguoi_duyet) REFERENCES NGUOI_DUNG(nguoi_dung_id)   
+);
+GO
+
+-- ============================================================
+--  NHÓM 6: QUẢNG CÁO & THÔNG BÁO
+-- ============================================================
+
+CREATE TABLE QUANG_CAO (
+    quang_cao_id    INT IDENTITY(1,1)   PRIMARY KEY, -- Đổi từ id
+    tieu_de         NVARCHAR(200)        NOT NULL,
+    noi_dung        NVARCHAR(MAX),
+    loai            VARCHAR(20)         NOT NULL,
+    bat_dau         DATE,
+    ket_thuc        DATE,
+    nguoi_tao       INT,
+    hien_thi        BIT not null,
+    tao_luc         DATETIME2           NOT NULL DEFAULT GETDATE(),
+    cap_nhat_luc    DATETIME2           NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT ck_qc_loai       CHECK (loai IN ('popup','slider','banner')),
+    CONSTRAINT ck_qc_ngay       CHECK (ket_thuc IS NULL OR ket_thuc > bat_dau),
+    CONSTRAINT fk_qc_nguoitao   FOREIGN KEY (nguoi_tao) REFERENCES NGUOI_DUNG(nguoi_dung_id) 
+);
+GO
+sp_help quang_cao
+
+create table HINH_ANH_QUANG_CAO (
+    hinh_anh_qc_id INT IDENTITY(1, 1) PRIMARY KEY,
+    quang_cao_id INT FOREIGN KEY REFERENCES QUANG_CAO(quang_cao_id),
+    hinh_anh VARCHAR(255),
+    public_url_id varchar(100)
+);
+
+CREATE TABLE THONG_BAO (
+    thong_bao_id    INT IDENTITY(1,1)   PRIMARY KEY, -- Đổi từ id
+    nguoi_gui_id    INT                 NOT NULL,
+    lop_hoc_id      INT,
+    hoc_phi_ky_id   INT,
+    tieu_de         NVARCHAR(200),
+    noi_dung        NVARCHAR(MAX)       NOT NULL,
+    kenh            VARCHAR(20)         NOT NULL,
+    loai            VARCHAR(20)         NOT NULL DEFAULT 'thong_bao_chung',
+    da_gui          BIT                 NOT NULL DEFAULT 0,
+    gui_luc         DATETIME2,
+    tao_luc         DATETIME2           NOT NULL DEFAULT GETDATE(),
+
+    CONSTRAINT ck_tb_kenh       CHECK (kenh IN ('zalo','facebook','sms','email','he_thong')),
+    CONSTRAINT ck_tb_loai       CHECK (loai IN ('nghi_hoc','hoc_phi','thong_bao_chung','khac')),
+    CONSTRAINT fk_tb_nguoigui   FOREIGN KEY (nguoi_gui_id) REFERENCES NGUOI_DUNG(nguoi_dung_id),
+    CONSTRAINT fk_tb_lophoc     FOREIGN KEY (lop_hoc_id) REFERENCES LOP_HOC(lop_hoc_id),   
+    CONSTRAINT fk_tb_hpk        FOREIGN KEY (hoc_phi_ky_id) REFERENCES HOC_PHI_KY(hoc_phi_ky_id) 
+);
+GO
+
+CREATE TABLE THONG_BAO_NGUOI_NHAN (
+    thong_bao_id    INT         NOT NULL,
+    nguoi_nhan_id   INT         NOT NULL,
+    da_doc          BIT         NOT NULL DEFAULT 0,
+    doc_luc         DATETIME2,
+
+    CONSTRAINT pk_tbnr              PRIMARY KEY (thong_bao_id, nguoi_nhan_id),
+    CONSTRAINT fk_tbnr_tb           FOREIGN KEY (thong_bao_id) REFERENCES THONG_BAO(thong_bao_id),   
+    CONSTRAINT fk_tbnr_nguoinhan    FOREIGN KEY (nguoi_nhan_id) REFERENCES NGUOI_DUNG(nguoi_dung_id)   
+);
+GO
+
+-- ============================================================
+--  TRIGGER: CẬP NHẬT THỜI GIAN
+-- ============================================================
+
+CREATE TRIGGER trg_nguoidung_update_time ON NGUOI_DUNG AFTER UPDATE AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE NGUOI_DUNG SET cap_nhat_luc = GETDATE() FROM NGUOI_DUNG nd JOIN inserted i ON nd.nguoi_dung_id = i.nguoi_dung_id;
+END;
+GO
+
+CREATE TRIGGER trg_hocphiky_update_time ON HOC_PHI_KY AFTER UPDATE AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE HOC_PHI_KY SET cap_nhat_luc = GETDATE() FROM HOC_PHI_KY hpk JOIN inserted i ON hpk.hoc_phi_ky_id = i.hoc_phi_ky_id;
+END;
+GO
+
+CREATE TRIGGER trg_quangcao_update_time ON QUANG_CAO AFTER UPDATE AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE QUANG_CAO SET cap_nhat_luc = GETDATE() FROM QUANG_CAO qc JOIN inserted i ON qc.quang_cao_id = i.quang_cao_id;
+END;    
+GO
+
+-- ============================================================
+--  INDEX (Đã cập nhật theo cột ID mới)
+-- ============================================================
+
+CREATE INDEX idx_nd_username        ON NGUOI_DUNG    (username, kich_hoat);
+CREATE INDEX idx_nd_email           ON NGUOI_DUNG    (email, kich_hoat);
+CREATE INDEX idx_nd_vaitro          ON NGUOI_DUNG    (vai_tro, kich_hoat);
+CREATE INDEX idx_buoihoc_lop_ngay   ON BUOI_HOC      (lop_hoc_id, ngay_hoc);
+CREATE INDEX idx_diemdanh_hocsinh   ON DIEM_DANH     (hoc_sinh_id);
+CREATE INDEX idx_diemdanh_buoi      ON DIEM_DANH     (buoi_hoc_id, trang_thai);
+CREATE INDEX idx_hpk_dangky_ky      ON HOC_PHI_KY    (dang_ky_id, nam, ky_dong, ky_so);
+CREATE INDEX idx_hpk_nam_ky         ON HOC_PHI_KY    (nam, ky_dong, ky_so);
+CREATE INDEX idx_hpk_ngay           ON HOC_PHI_KY    (tu_ngay, den_ngay);
+CREATE INDEX idx_ltf_ngaydong       ON LUOT_THU_PHI  (ngay_dong);
+CREATE INDEX idx_ttgv_thang_nam     ON THANH_TOAN_GV (nam, thang);
+CREATE INDEX idx_ttgv_ngaythanhtoan ON THANH_TOAN_GV (ngay_thanh_toan);
+CREATE INDEX idx_dangky_lop         ON DANG_KY_HOC   (lop_hoc_id);
+CREATE INDEX idx_pcgv_lop           ON PHAN_CONG_GV  (lop_hoc_id, ngay_bat_dau);
+CREATE INDEX idx_thongbao_lop       ON THONG_BAO     (lop_hoc_id, loai);
+CREATE INDEX idx_thongbao_hpk       ON THONG_BAO     (hoc_phi_ky_id);
+CREATE INDEX idx_blacklist_token_id ON blacklist_access_token(token_id);
+CREATE UNIQUE NONCLUSTERED INDEX uq_hoc_sinh_lien_he_chinh
+ON PHU_HUYNH_HOC_SINH (hoc_sinh_id)
+WHERE la_nguoi_lien_he_chinh = 1;
+
+GO
