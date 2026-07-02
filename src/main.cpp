@@ -205,5 +205,6 @@ int main()
     std::signal(SIGPIPE, SIG_IGN);
 
     server.Start();
+    
     return 0;
 }
