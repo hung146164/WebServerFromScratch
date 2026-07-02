@@ -17,15 +17,25 @@ file(GLOB ALL_TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 # ==========================================
 # 2. TẠO FILE CHẠY TEST
 # ==========================================
-add_executable(run_all_tests ${ALL_TEST_FILES} ${ALL_SRC_FILES})
+add_executable(testjson ${ALL_TEST_FILES} ${ALL_SRC_FILES})
 
 # ==========================================
 # 3. CHỈ ĐƯỜNG DẪN ĐẾN THƯ MỤC INCLUDE BÊN NGOÀI
 # ==========================================
-target_include_directories(run_all_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
+target_include_directories(testjson PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
 
 # ==========================================
 # 4. Tăng tốc
 # ==========================================
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
 set(CMAKE_BUILD_TYPE Release)
+
+# ==========================================
+# 5. TỰ ĐỘNG SINH FILE TEST LÚC BUILD (POST-BUILD AUTOMATION)
+# ==========================================
+add_custom_command(
+    TARGET testjson POST_BUILD
+    COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/sinhtest.py"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMENT "Auto-generating large_test.json inside build/tests/json/ directory..."
+)
