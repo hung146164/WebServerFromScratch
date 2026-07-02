@@ -106,7 +106,7 @@ Dự án triển khai một quy trình kiểm thử nghiêm ngặt nhằm xác m
   * Cấu trúc lồng sâu 5 cấp (Deep array/object nesting).
 * **Cơ chế tính toán Checksum:**
   Trong quá trình sinh file, script Python tính toán cộng dồn giá trị định danh của toàn bộ các đối tượng được ghi ra:
-  $$\text{Expected Checksum} = \sum_{i=3}^{N-1} \text{obj\_id}_i$$
+  $$\text{Expected Checksum} = \sum_{i=3}^{N-1} \text{obj-id}_i$$
 * **Bước 2: Đối chiếu chéo bằng C++ (`testjson`):**
   Khi chạy `./build/tests/json/testjson`, chương trình C++ nạp file JSON, parse thành cây DOM, duyệt qua toàn bộ cây để tính toán lại Checksum và đếm số phần tử.
   * **Xác thực thành công:** Chương trình so sánh `Calculated Checksum` thu được từ Parser C++ với `Expected Checksum` từ Python. Nếu trùng khớp, in ra thông báo: `[+] PASSED: Toan ven du lieu duoc xac nhan!`.
