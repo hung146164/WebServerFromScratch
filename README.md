@@ -105,8 +105,7 @@ Dự án triển khai một quy trình kiểm thử nghiêm ngặt nhằm xác m
   * Emojis và ký tự Unicode phức tạp.
   * Cấu trúc lồng sâu 5 cấp (Deep array/object nesting).
 * **Cơ chế tính toán Checksum:**
-  Trong quá trình sinh file, script Python tính toán cộng dồn giá trị định danh của toàn bộ các đối tượng được ghi ra:
-  $$\text{Expected Checksum} = \sum_{i=3}^{N-1} \text{obj-id}_i$$
+  * **Expected Checksum:** Tổng các `obj-id` từ đối tượng thứ 3 đến N-1.
 * **Bước 2: Đối chiếu chéo bằng C++ (`testjson`):**
   Khi chạy `./build/tests/json/testjson`, chương trình C++ nạp file JSON, parse thành cây DOM, duyệt qua toàn bộ cây để tính toán lại Checksum và đếm số phần tử.
   * **Xác thực thành công:** Chương trình so sánh `Calculated Checksum` thu được từ Parser C++ với `Expected Checksum` từ Python. Nếu trùng khớp, in ra thông báo: `[+] PASSED: Toan ven du lieu duoc xac nhan!`.
@@ -120,8 +119,7 @@ Tệp tin [test_HttpParser.cpp](tests/http/test_HttpParser.cpp) thực hiện ki
 * **Bài test 3 — TCP Stream Compaction (HTTP Pipelining):** Giả lập kịch bản dính gói gói tin TCP (khi gói thứ hai nối đuôi gói thứ nhất). Kiểm tra xem hàm `std::memmove` có di chuyển chính xác dữ liệu dính gói về đầu đệm phẳng `0` và reset máy trạng thái FSM (qua `NextRequest`) để tiếp tục phân tích yêu cầu kế tiếp hay không.
 * **Bài test 4 — Heavy HTTP Request & Edge Cases (Tải nặng 10MB):** 
   * **Cơ chế tự động sinh dữ liệu:** Khi biên dịch target `testhttp`, CMake tự động gọi script Python [generate_http_tests.py](tests/http/generate_http_tests.py) để sinh file test `heavy_http_request.raw` (dung lượng 10MB) chứa các trường hợp biên nguy hiểm: tiêu đề siêu dài (1000 bytes), tiêu đề giá trị rỗng, tiêu đề chứa nhiều khoảng trắng và một phần thân body ngẫu nhiên.
-  * **Xác thực toàn vẹn bằng Checksum:** Script Python tính trước giá trị Checksum của body theo thuật toán:
-    $$\text{Checksum} = \sum (\text{byte\_value}) \pmod{1000000007}$$
+  * **Xác thực toàn vẹn bằng Checksum:** Script Python tính trước giá trị Checksum của body theo thuật toán: **Checksum = tổng các giá trị byte % 1000000007**.
   * Chương trình kiểm thử C++ sẽ nạp toàn bộ file thô này, parse qua FSM, kiểm tra độ dài body và tính toán lại Checksum. Nếu khớp hoàn toàn với file metadata sinh bởi Python, độ toàn vẹn của FSM parser mới được xác nhận.
 
 #### Cách chạy bộ kiểm thử HTTP:
