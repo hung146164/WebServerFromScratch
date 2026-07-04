@@ -113,11 +113,23 @@ Dự án triển khai một quy trình kiểm thử nghiêm ngặt nhằm xác m
   * Điều này đảm bảo Parser đã đọc đúng từng thuộc tính, từng ký tự và không bỏ sót bất kỳ node nào trong file 50MB.
 
 ### 2. Kiểm thử Bộ phân tích cú pháp HTTP (HTTP Parser Unit Tests)
-Tệp tin [test_HttpParser.cpp](tests/http/test_HttpParser.cpp) thực hiện kiểm thử hộp trắng (White-box testing) đối với lớp `HttpRequest` nhằm xác nhận:
-* **Tách dòng Request Line**: Phân tích đúng phương thức (GET/POST), đường dẫn URL và phiên bản HTTP (HTTP/1.1).
-* **Cắt khoảng trắng Header**: Xác nhận các ký tự khoảng trắng thừa trước và sau khóa/giá trị của Header được loại bỏ chính xác (ví dụ: `Host:  localhost ` -> key: `Host`, val: `localhost`).
-* **TCP Stream Compaction**: Kiểm thử xem khi bộ đệm dính gói TCP (chứa dữ liệu của request tiếp theo), hàm `std::memmove` có di chuyển vùng nhớ dính gói về đầu đệm và reset chính xác máy trạng thái FSM để chuẩn bị nhận request kế tiếp hay không.
-* **Cách chạy:** Thực thi trực tiếp file biên dịch `./build/tests/http/testhttp`.
+Tệp tin [test_HttpParser.cpp](tests/http/test_HttpParser.cpp) thực hiện kiểm thử hộp trắng (White-box testing) đối với lớp `HttpRequest` thông qua 4 bài test cốt lõi nhằm xác minh tính đúng đắn tuyệt đối của máy trạng thái (FSM):
+
+* **Bài test 1 — Request Line Parsing:** Kiểm tra tính chính xác của việc bóc tách dòng trạng thái đầu tiên: phương thức HTTP (`GET`), đường dẫn URL (`/api/view/index.html`), và phiên bản giao thức (`HTTP/1.1`).
+* **Bài test 2 — Header Parsing and Space Trimming:** Kiểm thử cơ chế cắt bỏ các khoảng trắng thừa xung quanh giá trị của tiêu đề (header values) nhưng vẫn giữ lại khoảng trắng có chủ ý ở đuôi (ví dụ: `Connection:  keep-alive` $\to$ `keep-alive`).
+* **Bài test 3 — TCP Stream Compaction (HTTP Pipelining):** Giả lập kịch bản dính gói gói tin TCP (khi gói thứ hai nối đuôi gói thứ nhất). Kiểm tra xem hàm `std::memmove` có di chuyển chính xác dữ liệu dính gói về đầu đệm phẳng `0` và reset máy trạng thái FSM (qua `NextRequest`) để tiếp tục phân tích yêu cầu kế tiếp hay không.
+* **Bài test 4 — Heavy HTTP Request & Edge Cases (Tải nặng 10MB):** 
+  * **Cơ chế tự động sinh dữ liệu:** Khi biên dịch target `testhttp`, CMake tự động gọi script Python [generate_http_tests.py](tests/http/generate_http_tests.py) để sinh file test `heavy_http_request.raw` (dung lượng 10MB) chứa các trường hợp biên nguy hiểm: tiêu đề siêu dài (1000 bytes), tiêu đề giá trị rỗng, tiêu đề chứa nhiều khoảng trắng và một phần thân body ngẫu nhiên.
+  * **Xác thực toàn vẹn bằng Checksum:** Script Python tính trước giá trị Checksum của body theo thuật toán:
+    $$\text{Checksum} = \sum (\text{byte\_value}) \pmod{1000000007}$$
+  * Chương trình kiểm thử C++ sẽ nạp toàn bộ file thô này, parse qua FSM, kiểm tra độ dài body và tính toán lại Checksum. Nếu khớp hoàn toàn với file metadata sinh bởi Python, độ toàn vẹn của FSM parser mới được xác nhận.
+
+#### Cách chạy bộ kiểm thử HTTP:
+Khi thực hiện build dự án, target test sẽ tự động biên dịch. Bạn chỉ cần chạy:
+```bash
+# Thực thi file binary kiểm thử
+./build/tests/http/testhttp
+```
 
 ---
 
