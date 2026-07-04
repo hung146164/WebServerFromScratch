@@ -23,3 +23,11 @@ target_link_libraries(testhttp PRIVATE Threads::Threads)
 
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
 set(CMAKE_BUILD_TYPE Release)
+
+# Tu dong chay script python sinh file request 10MB sau khi compile
+add_custom_command(
+    TARGET testhttp POST_BUILD
+    COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/generate_http_tests.py" 10
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMENT "Auto-generating 10MB HTTP request payload inside tests/http directory..."
+)
