@@ -406,6 +406,7 @@ void Worker::HandleRequest(int fd)
 
         // lấy con trỏ kí tự cuối ở cache, thêm text vào
         char *write_ptr = &request->cache[request->tail_idx];
+        //số lượng byte mới luôn <= space
         ssize_t bytes_read = recv(fd, write_ptr, (int)space, 0);
 
         if (bytes_read < 0)
