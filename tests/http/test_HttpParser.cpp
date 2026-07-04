@@ -106,14 +106,28 @@ void TestTcpStreamCompaction() {
 void TestHeavyRequestParsing() {
     std::cout << "[*] Running TestHeavyRequestParsing...\n";
     
-    std::string path_prefix = "tests/http/";
-    std::string request_file = path_prefix + "heavy_http_request.raw";
-    std::string metadata_file = path_prefix + "heavy_http_metadata.txt";
+    std::string path_prefix = "";
+    std::string request_file = "heavy_http_request.raw";
+    std::string metadata_file = "heavy_http_metadata.txt";
     
-    // Kiem tra duong dan fallback neu chay tu cac thu muc khac nhau (build/ hoac root/)
+    // 1. Kiem tra thu muc hien tai (khi chay truc tiep tu build/tests/http/)
     std::ifstream meta(metadata_file);
     if (!meta.is_open()) {
-        // Thu muc hoat dong neu chay tu build/
+        // 2. Kiem tra tu thu muc root cua du an
+        path_prefix = "tests/http/";
+        request_file = path_prefix + "heavy_http_request.raw";
+        metadata_file = path_prefix + "heavy_http_metadata.txt";
+        meta.open(metadata_file);
+    }
+    if (!meta.is_open()) {
+        // 3. Kiem tra neu chay tu root cua du an nhung doc trong build/
+        path_prefix = "build/tests/http/";
+        request_file = path_prefix + "heavy_http_request.raw";
+        metadata_file = path_prefix + "heavy_http_metadata.txt";
+        meta.open(metadata_file);
+    }
+    if (!meta.is_open()) {
+        // 4. Fallback ve thu muc source neu build/ thieu file
         path_prefix = "../tests/http/";
         request_file = path_prefix + "heavy_http_request.raw";
         metadata_file = path_prefix + "heavy_http_metadata.txt";

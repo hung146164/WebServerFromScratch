@@ -67,5 +67,5 @@ if __name__ == "__main__":
         except ValueError:
             pass
             
-    out_dir = os.path.dirname(os.path.abspath(__file__))
+    out_dir = os.getcwd()
     generate_heavy_http_request(out_dir, size)
