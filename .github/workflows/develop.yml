@@ -1,7 +1,7 @@
 name: WebServerVDT
 on:
   push:
-    branches: [ "deploy" ] 
+    branches: [ "main" ] 
 jobs:
   
   build-and-push:
