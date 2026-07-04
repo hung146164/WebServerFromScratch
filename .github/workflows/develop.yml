@@ -61,7 +61,8 @@ jobs:
               --name webserver \
               -p 8081:8081 \
               --ulimit nofile=65535:65535 \
-              -v /root/www_download:/app/www/download \
+              --log-driver none \
+              -v /root/www_download/heavy_1.5gb.bin:/app/www/download/heavy_1.5gb.bin \
               -v /root/uploads:/app/www/upload \
               --restart always \
               ghcr.io/$REPO_LOWER:latest
