@@ -4,7 +4,8 @@ RUN apk add --no-cache \
     g++ \
     cmake \
     make \
-    musl-dev
+    musl-dev \
+    python3
 
 WORKDIR /app
 COPY . .
