@@ -43,19 +43,25 @@ jobs:
           username: ${{ secrets.SERVER_USER }} 
           key: ${{ secrets.SSH_PRIVATE_KEY }} 
           script: |
+            # Mở giới hạn OS trước khi chạy server
+            ulimit -n 65535 || true
+            sysctl -w net.core.somaxconn=65535 || true
+            sysctl -w net.ipv4.tcp_max_syn_backlog=65535 || true
+
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            
+
             REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-            
-            docker pull ghcr.io/$REPO_LOWER:latest          
-            
-            docker stop roomchat || true
-            docker rm roomchat || true
-            
-            
+
+            docker pull ghcr.io/$REPO_LOWER:latest
+
+            docker stop webserver || true
+            docker rm webserver || true
+
             docker run -d \
-              --name roomchat \
-              -p 8080:8080 \
-              --ulimit nofile=100000:100000 \
+              --name webserver \
+              -p 8081:8081 \
+              --ulimit nofile=65535:65535 \
+              -v /root/www_download:/app/www/download \
+              -v /root/uploads:/app/www/upload \
               --restart always \
               ghcr.io/$REPO_LOWER:latest
