@@ -9,17 +9,19 @@ RUN apk add --no-cache \
 WORKDIR /app
 COPY . .
 
-RUN cmake -B build
-RUN cmake --build build
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release
+RUN cmake --build build -j$(nproc)
 
-# runtime
-
+# ---- Runtime stage ----
 FROM alpine:3.20
 
 RUN apk add --no-cache libstdc++
 
 WORKDIR /app
-COPY --from=builder /app/build/webserver .
 
-EXPOSE 8080
+COPY --from=builder /app/build/webserver .
+COPY config.json .
+COPY www/ ./www/
+
+EXPOSE 8081
 CMD ["./webserver"]
