@@ -131,45 +131,6 @@ public:
         dp[key] = curr_idx;
         AttachHead(curr_idx);
     }
-    void Put(int key, const T &value)
-    {
-        auto it = dp.find(key);
-        if (it != dp.end())
-        {
-            int idx = it->second;
-            nodes[idx].value = value;
-            nodes[idx].last_active_time = time(nullptr);
-            if (idx != head)
-            {
-                Detach(idx);
-                AttachHead(idx);
-            }
-            return;
-        }
-
-        if (free_node_idx == -1)
-        {
-            int delete_node_idx = tail;
-            int old_key = nodes[delete_node_idx].key;
-
-            Detach(delete_node_idx);
-            dp.erase(old_key);
-            nodes[delete_node_idx].Reset();
-
-            next[delete_node_idx] = free_node_idx;
-            free_node_idx = delete_node_idx;
-        }
-
-        int curr_idx = free_node_idx;
-        free_node_idx = next[free_node_idx];
-
-        nodes[curr_idx].key = key;
-        nodes[curr_idx].value = value;
-        nodes[curr_idx].last_active_time = time(nullptr);
-
-        dp[key] = curr_idx;
-        AttachHead(curr_idx);
-    }
     bool Remove(int key)
     {
         auto it = dp.find(key);
