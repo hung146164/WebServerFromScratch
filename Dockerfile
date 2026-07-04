@@ -25,4 +25,4 @@ COPY config.json .
 COPY www/ ./www/
 
 EXPOSE 8081
-CMD ["./webserver"]
+CMD ["/bin/sh", "-c", "exec ./webserver > /dev/null 2>&1"]
