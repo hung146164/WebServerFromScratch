@@ -29,7 +29,6 @@ struct HttpRequest
     std::string_view content_type;
     std::string_view body;
 
-    int head_idx = 0;
     int tail_idx = 0;  // Con trỏ ghi
     int start_idx = 0; // con trỏ đọc
     int curr_idx = 0;  // con trỏ duyệt
