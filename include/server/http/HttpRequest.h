@@ -12,6 +12,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <ctime>
 
 #include "HttpMethod.h"
 #include "HttpParserState.h"
@@ -42,7 +43,7 @@ struct HttpRequest
 
     // Chạy vòng lặp phân tích cú pháp
     const HttpParserState *Parse();
-
+    
     mutable bool is_sending_file = false;
     mutable int file_fd = -1;
     mutable off_t file_offset = 0;
