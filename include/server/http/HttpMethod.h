@@ -9,7 +9,9 @@
 #ifndef CPPSERVER_HTTP_HTTPMETHOD_H
 #define CPPSERVER_HTTP_HTTPMETHOD_H
 
-enum class HttpMethod
+#include <cstdint>
+
+enum class HttpMethod : uint8_t
 {
     GET,
     POST,
