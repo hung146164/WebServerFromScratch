@@ -380,3 +380,87 @@ footer {
   max-height: 150px;
   overflow-y: auto;
 }
+
+/* FSM Parser Simulator Nodes */
+.fsm-state-node {
+  transition: all 0.3s ease;
+}
+.fsm-state-node.active-state {
+  border-color: var(--accent-cyan) !important;
+  color: #fff !important;
+  background: rgba(6, 182, 212, 0.2) !important;
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.4);
+  font-weight: 600;
+  transform: scale(1.03);
+}
+.fsm-state-node.passed-state {
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  color: var(--success) !important;
+  background: rgba(16, 185, 129, 0.08) !important;
+}
+
+/* FSM Parser Simulator Visual Text */
+#fsm-visual-text {
+  width: 100%;
+  height: 180px;
+  font-family: monospace;
+  font-size: 0.85rem;
+  background: rgba(0, 0, 0, 0.3);
+  color: #8aadf4;
+  border: 1px solid var(--border-card);
+  border-radius: 10px;
+  padding: 0.75rem;
+  box-sizing: border-box;
+  overflow: auto;
+  white-space: pre;
+  margin: 0;
+  display: none;
+}
+
+/* Light Theme Variables Overrides */
+body.light-theme {
+  --bg-primary: #f1f5f9;
+  --bg-secondary: #e2e8f0;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --border-card: rgba(0, 0, 0, 0.1);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --shadow-neon: 0 4px 20px rgba(59, 130, 246, 0.1);
+}
+body.light-theme textarea,
+body.light-theme input,
+body.light-theme select {
+  background-color: rgba(0, 0, 0, 0.03);
+  color: #0f172a;
+  border-color: rgba(0, 0, 0, 0.15);
+}
+body.light-theme .preview-box,
+body.light-theme #console-logs {
+  background: rgba(255, 255, 255, 0.95);
+  color: #0f172a;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+body.light-theme .terminal {
+  background-color: #f8fafc;
+  border-color: rgba(0, 0, 0, 0.15);
+}
+body.light-theme .log-info { color: #0284c7; }
+body.light-theme .log-success { color: #16a34a; }
+body.light-theme .log-error { color: #dc2626; }
+body.light-theme .log-warning { color: #d97706; }
+body.light-theme #fsm-visual-text {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}
+body.light-theme #fsm-input {
+  background: rgba(0, 0, 0, 0.02) !important;
+  color: #0f172a !important;
+}
+body.light-theme #json-input {
+  background: rgba(0, 0, 0, 0.02) !important;
+  color: #0f172a !important;
+}
+@keyframes blink {
+  50% { opacity: 0.3; }
+}

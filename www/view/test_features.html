@@ -13,10 +13,15 @@
         <div class="logo-icon">V</div>
         <div class="logo-text">WebServerVdt</div>
       </div>
-      <nav>
-        <a href="index.html">Dashboard</a>
-        <a href="test_features.html" class="active">Tính năng</a>
-      </nav>
+      <div style="display: flex; align-items: center; gap: 1.5rem;">
+        <nav style="margin-right: 0.5rem;">
+          <a href="index.html">Dashboard</a>
+          <a href="test_features.html" class="active">Tính năng</a>
+        </nav>
+        <button class="btn btn-secondary" id="btn-theme-toggle" style="padding: 0.5rem; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer;" title="Chuyển chế độ Sáng/Tối">
+          🌓
+        </button>
+      </div>
     </header>
 
     <section class="hero">
@@ -116,7 +121,7 @@
         <div style="display: flex; gap: 0.35rem; margin-bottom: 0.75rem;">
           <button class="btn btn-secondary" id="btn-json-gen-100" style="flex: 1; font-size: 0.75rem; padding: 0.4rem 0.25rem;">Sinh 100</button>
           <button class="btn btn-secondary" id="btn-json-gen-500" style="flex: 1; font-size: 0.75rem; padding: 0.4rem 0.25rem;">Sinh 500</button>
-          <button class="btn btn-secondary" id="btn-json-gen-10000" style="flex: 1; font-size: 0.75rem; padding: 0.4rem 0.25rem;">Sinh 10000</button>
+          <button class="btn btn-secondary" id="btn-json-gen-2000" style="flex: 1; font-size: 0.75rem; padding: 0.4rem 0.25rem;">Sinh 2000</button>
         </div>
 
         <button class="btn btn-primary" id="btn-parse-json" style="width: 100%;">Phân tích cú pháp C++</button>
@@ -134,6 +139,65 @@
           <button class="btn btn-primary" id="btn-stress-test-200" style="flex: 1; background: var(--accent-gradient);">Bắn 200 Requests</button>
         </div>
         <div id="stress-test-status" class="preview-box">Chưa chạy kiểm thử hiệu năng.</div>
+      </div>
+
+      <!-- 6. FSM Parser Simulator Card -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="badge badge-info">FSM State Machine</div>
+        <h2>Trực Quan Hóa Thuật Toán FSM HTTP Parser</h2>
+        <p>Mô phỏng từng bước máy trạng thái phân đoạn (FSM) trong nhân C++ khi bóc tách chuỗi HTTP thô. Thầy cô có thể quan sát sự thay đổi trạng thái và vị trí con trỏ đọc thời gian thực.</p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
+          <div>
+            <div class="form-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                <label style="margin: 0;">Chuỗi HTTP Request thô:</label>
+                <div style="display: flex; gap: 0.25rem;">
+                  <button class="btn btn-secondary" id="btn-fsm-tpl-post" style="font-size: 0.65rem; padding: 0.2rem 0.4rem; cursor: pointer;" title="Mẫu POST chuẩn (Thành công)">POST</button>
+                  <button class="btn btn-secondary" id="btn-fsm-tpl-get" style="font-size: 0.65rem; padding: 0.2rem 0.4rem; cursor: pointer;" title="Mẫu GET chuẩn (Thành công)">GET</button>
+                  <button class="btn btn-secondary" id="btn-fsm-tpl-err-colon" style="font-size: 0.65rem; padding: 0.2rem 0.4rem; cursor: pointer;" title="Lỗi thiếu dấu ':' ở Header (Trạng thái ERROR)">Lỗi Colon</button>
+                  <button class="btn btn-secondary" id="btn-fsm-tpl-err-len" style="font-size: 0.65rem; padding: 0.2rem 0.4rem; cursor: pointer;" title="Lỗi thiếu body (Trạng thái ERROR)">Lỗi Body</button>
+                </div>
+              </div>
+              <textarea id="fsm-input" style="width: 100%; height: 180px; font-family: monospace; font-size: 0.85rem; background: rgba(0,0,0,0.3); color: #8aadf4; border: 1px solid var(--border-card); border-radius: 10px; padding: 0.75rem; box-sizing: border-box; resize: none; white-space: pre;">POST /api/parse_students HTTP/1.1
+Host: localhost:8081
+Content-Type: application/json
+Content-Length: 15
+
+{"name": "Hung"}</textarea>
+              <pre id="fsm-visual-text"></pre>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-primary" id="btn-fsm-start" style="flex: 1;">Chạy Mô Phỏng</button>
+              <button class="btn btn-secondary" id="btn-fsm-reset" style="padding: 0.75rem 1rem;">Reset</button>
+            </div>
+          </div>
+          
+          <div style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <label>Bảng Trạng Thái Máy FSM:</label>
+              <div id="fsm-states-container" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 0.5rem;">
+                <div class="fsm-state-node" id="state-START" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">1. START</div>
+                <div class="fsm-state-node" id="state-METHOD" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">2. METHOD</div>
+                <div class="fsm-state-node" id="state-URL" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">3. URL</div>
+                <div class="fsm-state-node" id="state-PROTOCOL" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">4. PROTOCOL</div>
+                <div class="fsm-state-node" id="state-PROTO_CR" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">5. PROTO_CR</div>
+                <div class="fsm-state-node" id="state-ST_HDR" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">6. ST_HDR</div>
+                <div class="fsm-state-node" id="state-ST_HDR_CR" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">7. ST_HDR_CR</div>
+                <div class="fsm-state-node" id="state-HDR_KEY" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">8. HDR_KEY</div>
+                <div class="fsm-state-node" id="state-HDR_VAL" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">9. HDR_VAL</div>
+                <div class="fsm-state-node" id="state-HDR_VAL_CR" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">10. HDR_VAL_CR</div>
+                <div class="fsm-state-node" id="state-ST_BODY" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">11. ST_BODY</div>
+                <div class="fsm-state-node" id="state-COMPLETE" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">12. COMPLETE</div>
+                <div class="fsm-state-node" id="state-ERROR" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted); grid-column: span 3;">13. ERROR</div>
+              </div>
+            </div>
+
+            <div class="preview-box" id="fsm-log-box" style="margin-top: 1rem; max-height: 100px; font-family: monospace; font-size: 0.8rem; color: #a6da95;">
+              Nhấp "Chạy Mô Phỏng" để bắt đầu quan sát các bước bóc tách...
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
