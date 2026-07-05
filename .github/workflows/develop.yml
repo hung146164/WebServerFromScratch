@@ -62,6 +62,7 @@ jobs:
               -p 8081:8081 \
               --ulimit nofile=65535:65535 \
               --log-driver none \
+              -v /root/www_download/heavy_file_50mb.bin:/app/www/download/heavy_file_50mb.bin\
               -v /root/www_download/heavy_1.5gb.bin:/app/www/download/heavy_1.5gb.bin \
               -v /root/uploads:/app/www/upload \
               --restart always \
