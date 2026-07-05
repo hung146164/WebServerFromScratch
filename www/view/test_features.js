@@ -77,12 +77,8 @@ document.getElementById('btn-upload').addEventListener('click', async () => {
         <strong>Tên file gốc:</strong> ${file.name}<br>
         <strong>Tên lưu trữ:</strong> ${json.filename}<br>
         <strong>Kích thước:</strong> ${(file.size/1024).toFixed(2)} KB<br>
-        <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
-          <a href="/api/view/upload/${json.filename}" target="_blank" class="btn btn-secondary" style="flex: 1; font-size: 0.75rem; text-decoration: none; text-align: center; padding: 0.3rem 0;">Xem tệp</a>
-          <a href="/api/download/upload/${json.filename}" class="btn btn-primary" style="flex: 1; font-size: 0.75rem; text-decoration: none; text-align: center; padding: 0.3rem 0;">Tải về tệp</a>
-        </div>
-        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem; line-height: 1.2;">
-          * Lưu ý: Để link tải hoạt động mà không sửa code C++, bạn cần chạy lệnh này trên server một lần: <code>ln -sf ../upload www/view/upload</code>
+        <div style="font-size: 0.75rem; color: var(--success); margin-top: 0.5rem; font-style: italic;">
+          ✓ Tệp tin đã được lưu trữ an toàn trong thư mục <code>www/upload</code> trên Server.
         </div>
       `;
     } else {
