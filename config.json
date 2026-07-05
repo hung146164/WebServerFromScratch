@@ -8,6 +8,6 @@
   "max_listen_queue": 4096,
   "max_client_per_ip": 100,
   "read_timeout_sec": 15,
-  "rate_limit_per_sec": 50,
+  "rate_limit_per_sec": 5,
   "enable_ebpf": false
 }
