@@ -18,7 +18,7 @@ struct Node
     int pre = -1;
     int next = -1;
     int key = -1;
-    time_t last_active_time = 0;
+    uint32_t last_active_time = 0;
 
     void Reset()
     {
