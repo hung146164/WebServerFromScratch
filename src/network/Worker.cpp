@@ -400,7 +400,7 @@ void Worker::HandleRequest(int fd)
         {
             std::string error_msg = "Payload Too Large";
             Http::Error(fd, 413, error_msg);
-            CloseConnection(fd);
+            shutdown(fd, SHUT_WR);
             return;
         }
 
@@ -497,7 +497,7 @@ void Worker::HandleRequest(int fd)
             {
                 std::string error_msg = "Bad Request";
                 Http::Error(fd, 400, error_msg);
-                CloseConnection(fd);
+                shutdown(fd, SHUT_WR);
                 connection_closed = true;
                 break;
             }
