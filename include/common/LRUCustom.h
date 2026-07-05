@@ -162,7 +162,7 @@ public:
         }
     }
 
-    time_t GetLastActiveTime(int key)
+    uint32_t GetLastActiveTime(int key)
     {
         auto it = dp.find(key);
         if (it == dp.end())
