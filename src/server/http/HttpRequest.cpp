@@ -25,7 +25,7 @@ const HttpParserState *HttpRequest::Parse()
     return state;
 }
 
-HttpRequest::HttpRequest(int bufferSize)
+HttpRequest::HttpRequest(size_t bufferSize)
 {
     cache.resize(bufferSize);
     Reset();
@@ -56,7 +56,7 @@ void HttpRequest::Reset()
     bytes_sent_in_period = 0;
 }
 
-void HttpRequest::NextRequest(int new_tail)
+void HttpRequest::NextRequest(uint32_t new_tail)
 {
     state = StartState::Instance();
     method = HttpMethod::UNKNOWN;
@@ -70,7 +70,12 @@ void HttpRequest::NextRequest(int new_tail)
     tail_idx = new_tail;
 }
 
-static inline int span(int from, int to) { return (int)(to - from); }
+static inline size_t span(uint32_t from, uint32_t to)
+{
+    if (to < from)
+        return 0;
+    return (size_t)(to - from);
+}
 
 // --- StartState ---
 const HttpParserState *StartState::Instance()
@@ -320,7 +325,7 @@ const HttpParserState *StartBodyState::Instance()
 const HttpParserState *StartBodyState::HandleChar(char c, HttpRequest &req) const
 {
     (void)c;
-    int body_len = req.curr_idx - req.start_idx + 1;
+    size_t body_len = (size_t)(req.curr_idx - req.start_idx + 1);
 
     if (body_len >= req.content_len)
     {
