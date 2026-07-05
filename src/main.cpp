@@ -183,9 +183,11 @@ int main()
 
     // API hiển thị/xem file trực tiếp
     Http::Router::Register(HttpMethod::GET, "/api/view/*", view_handler);
+    Http::Router::Register(HttpMethod::HEAD, "/api/view/*", view_handler);
 
     // API tải file về máy (attachment)
     Http::Router::Register(HttpMethod::GET, "/api/download/*", download_handler);
+    Http::Router::Register(HttpMethod::HEAD, "/api/download/*", download_handler);
 
     // API upload
     Http::Router::Register(HttpMethod::POST, "/api/upload", Http::HandleFileUpload);
