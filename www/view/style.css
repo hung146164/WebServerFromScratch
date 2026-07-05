@@ -349,3 +349,34 @@ footer {
   border-top: 1px solid var(--border-card);
   margin-top: 4rem;
 }
+
+/* Feature Grid Styling */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+.console-section {
+  margin-top: 2rem;
+}
+.row-flex {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+}
+.row-flex .form-group {
+  margin-bottom: 0;
+  flex: 1;
+}
+.preview-box {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border-card);
+  word-break: break-all;
+  max-height: 150px;
+  overflow-y: auto;
+}
