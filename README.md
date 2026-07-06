@@ -147,30 +147,31 @@ Hiệu năng thực tế của hệ thống được kiểm thử nghiệm ngặ
 
 #### Kịch bản 1: Baseline Throughput & Latency (Tải tĩnh index.html 1.6KB)
 *Giả lập 200 kết nối song song duy trì liên tục trong thời gian 30 giây bằng wrk.*
-* **Requests per second (RPS):** **`18,615.69 req/s`**
-* **Độ trễ trung vị (p50 Latency):** `8.96 ms`
-* **Độ trễ bách phân vị 99 (p99 Latency):** **`31.80 ms`**
-* **Thông lượng truyền tải:** `32.85 MB/s`
+* **Requests per second (RPS):** **`21,907.44 req/s`**
+* **Độ trễ trung vị (p50 Latency):** `7.47 ms`
+* **Độ trễ bách phân vị 90 (p90 Latency):** `18.16 ms`
+* **Độ trễ bách phân vị 99 (p99 Latency):** **`31.51 ms`**
+* **Thông lượng truyền tải:** `38.66 MB/s`
 
 #### Kịch bản 2: Concurrency Stress Test C10K (10,000 Kết nối đồng thời)
-*Giả lập 10,000 người truy cập và tải file đồng thời trong 20 giây bằng wrk.*
-* **Đọc trang tĩnh (`index.html`):** Đạt **`21,445.89 RPS`**, độ trễ p99 duy trì ở mức `143.99 ms`.
-* **Tải tệp tin lớn (`222.pdf` - 650KB):** Đạt thông lượng mạng truyền tải kịch trần **`131.62 MB/s`** (tương đương ~1.05 Gbps), vắt kiệt hoàn toàn băng thông card mạng vật lý của Droplet.
-* **Mức RAM tiêu thụ của Server:** Duy trì ổn định ở mức **`1.02 GiB`** (chủ yếu là bộ đệm Socket TCP của hệ điều hành cấp cho 10,000 kết nối song song).
+*Giả lập 10,000 người truy cập và tải file đồng thời bằng wrk.*
+* **Đọc trang tĩnh (`index.html` trong 60 giây):** Đạt **`15,826.07 RPS`**, thông lượng `27.98 MB/s`, độ trễ p50 đạt `409.36 ms` và p99 là `1.71 s` (0 lỗi kết nối `connect 0`).
+* **Xem tệp tài liệu (`222.pdf` - 650KB trong 100 giây):** Đạt thông lượng mạng truyền tải ổn định **`87.94 MB/s`** (tương đương ~703 Mbps), vắt kiệt hoàn toàn băng thông card mạng vật lý của Droplet, độ trễ p50 là `118.18 ms` và p99 là `1.83 s`.
+* **Mức RAM tiêu thụ của Server:** Duy trì ở mức **`966 MB`** lúc rảnh rỗi (pre-allocate tĩnh) và chỉ tăng lên tối đa **`1.60 GiB`** dưới áp lực tải cực hạn của 10,000 luồng TCP đồng thời (do hệ điều hành tự động cấp phát bộ đệm TCP Socket ở tầng nhân để truyền dẫn).
 
 #### Kịch bản 3: Tải tệp tin lớn song song (sendfile Zero-copy - 100 CCU * 1.5GB)
-*100 người dùng đồng thời tải tệp tin nặng 1.5 GB về máy (tổng dung lượng truyền tải thực tế đạt 154 GB).*
-* **Tổng dung lượng truyền tải:** `154 GB`
-* **Tổng thời gian hoàn thành:** `673 giây` (khoảng 11.2 phút).
-* **Tốc độ tải trung bình mỗi client:** `2.35 MB/s`.
-* **Bộ nhớ RAM Server tiêu thụ cực đại:** **`1.145 GiB`** (hoàn toàn đi ngang và ổn định, chứng minh cơ chế **Zero-copy** không nạp dữ liệu file vào bộ đệm Userspace).
+*100 người dùng đồng thời tải tệp tin nặng 1.5 GB về máy (tổng dung lượng truyền tải thực tế đạt 150 GB).*
+* **Tổng dung lượng truyền tải:** `150 GB`
+* **Tổng thời gian hoàn thành:** `715 giây` (khoảng 11.9 phút).
+* **Tốc độ tải trung bình mỗi client:** `2.15 MB/s`.
+* **Bộ nhớ RAM Server tiêu thụ cực đại:** **`1.150 GiB`** (hoàn toàn đi ngang và ổn định, chứng minh cơ chế **Zero-copy** không sao chép dữ liệu file vào bộ đệm Userspace).
 
 #### Kịch bản 4: Phân tích JSON Memory Pool (POST /api/parse_students)
 *Đo thời gian parse dữ liệu JSON sinh viên bằng bộ nhớ Arena Pool tĩnh ghim trên luồng (`thread_local`).*
-* **Parse 100 sinh viên (dung lượng nhỏ):** Mất **`102 us` (0.10 ms)** | Trả về `200 OK`.
-* **Parse 1,000 sinh viên (dung lượng vừa):** Mất **`802.7 us` (0.80 ms)** | Trả về `200 OK`.
-* **Parse 5,000 sinh viên (vượt giới hạn an toàn):** Trả về **`413 Payload Too Large`** (DDoS shield kích hoạt ngắt kết nối lập tức bảo vệ RAM).
-* **Thông lượng parser thô:** Đạt **`1,081.39 RPS`** khi bắn tải liên tục file 100 sinh viên bằng `wrk`.
+* **Parse 100 sinh viên (dung lượng nhỏ):** Mất **`134 us` (0.13 ms)** | Trả về `200 OK`.
+* **Parse 500 sinh viên (dung lượng vừa):** Mất **`489 us` (0.49 ms)** | Trả về `200 OK`.
+* **Parse 2,000 sinh viên (vượt giới hạn an toàn):** Trả về **`413 Payload Too Large`** (DDoS shield kích hoạt ngắt kết nối lập tức khi phát sinh 10,001 nodes vượt quá ngưỡng an toàn cấu hình là 10,000 nodes).
+* **Thông lượng parser thô:** Đạt **`969.24 RPS`** khi bắn tải liên tục file 100 sinh viên bằng `wrk`.
 
 ---
 
