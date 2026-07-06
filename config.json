@@ -9,5 +9,5 @@
   "max_client_per_ip": 100,
   "read_timeout_sec": 15,
   "rate_limit_per_sec": 5,
-  "enable_ebpf": false
+  "enable_ebpf": false 
 }
