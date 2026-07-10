@@ -6,8 +6,8 @@
   "client_per_worker": 3500,
   "max_epoll_events": 1024,
   "max_listen_queue": 4096,
-  "max_client_per_ip": 100,
+  "max_client_per_ip": 1000000,
   "read_timeout_sec": 15,
-  "rate_limit_per_sec": 5,
-  "enable_ebpf": false 
+  "rate_limit_per_sec": 1000000,
+  "enable_ebpf": false
 }
