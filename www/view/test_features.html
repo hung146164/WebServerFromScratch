@@ -31,56 +31,24 @@
     </section>
 
     <div class="feature-grid">
-      <!-- 1. Heavy File Download Card -->
-      <div class="card">
-        <div class="badge badge-success">Zero-Copy Sendfile</div>
-        <h2>Tải File Nặng (1.5GB)</h2>
-        <p>Truyền dữ liệu trực tiếp từ đĩa cứng sang card mạng ở không gian nhân (Kernel Space) bằng <code>sendfile</code>, không tốn tài nguyên RAM của Server hay Client. Tải trực tiếp về thư mục Downloads của bạn.</p>
+                  <!-- 1. Test Files Download Card -->
+      <div class="card" style="grid-column: span 2;">
+        <div class="badge badge-success">Zero-Copy & Multi-Reactor</div>
+        <h2>Xem và Tải Các File Kiểm Thử Hiệu Năng (Test Files Download & View)</h2>
+        <p>Hệ thống hỗ trợ xem trực tiếp hoặc tải các tệp tin kiểm thử với các kích thước và định dạng khác nhau để đánh giá thông lượng của cơ chế truyền tải Zero-Copy <code>sendfile</code>.</p>
         
-        <a href="/api/download/heavy_1.5gb.bin" class="btn btn-primary" style="width: 100%; text-decoration: none; margin-top: 1rem; text-align: center; display: block;" onclick="logToConsole('Bắt đầu tải tệp tin 1.5GB qua sendfile zero-copy. Trình duyệt đang thực hiện tải về đĩa cứng...', 'warning')">
-          Tải File 1.5GB Về Máy
-        </a>
-        <div id="download-status" class="preview-box" style="font-size:0.8rem; color:var(--text-muted);">
-          Gợi ý: Nhấn chuột để kích hoạt download gốc của trình duyệt (xem tiến độ tải ở mục Download của Chrome/Firefox).
-        </div>
-      </div>
-
-      <!-- 2. Light File Download Card -->
-      <div class="card">
-        <div class="badge badge-success">MIME & Content-Disposition</div>
-        <h2>Tải Tài Nguyên Nhẹ (CSS & PDF)</h2>
-        <p>So sánh sự khác biệt khi trình duyệt tự động hiển thị tài nguyên tĩnh và khi ép buộc trình duyệt tải xuống (Save As) bằng tham số <code>?download=true</code>.</p>
-        
-        <div style="margin-top: 1rem;">
-          <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-muted);">Tài liệu PDF (222.pdf):</h4>
-          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-            <a href="/api/view/222.pdf" target="_blank" class="btn btn-secondary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Mở tài liệu 222.pdf trên tab mới để xem trực tiếp...', 'info')">
-              Xem trực tiếp PDF
-            </a>
-            <a href="/api/download/222.pdf" class="btn btn-primary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Yêu cầu tải tệp 222.pdf về đĩa cứng...', 'success')">
-              Tải file PDF
-            </a>
-          </div>
-
-          <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-muted);">Hình ảnh JPEG (333.jpg):</h4>
-          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-            <a href="/api/view/333.jpg" target="_blank" class="btn btn-secondary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Mở hình ảnh 333.jpg trên tab mới để xem trực tiếp...', 'info')">
-              Xem trực tiếp Ảnh
-            </a>
-            <a href="/api/download/333.jpg" class="btn btn-primary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Yêu cầu tải tệp hình ảnh 333.jpg về đĩa cứng...', 'success')">
-              Tải file Ảnh
-            </a>
-          </div>
-
-          <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-muted);">Tệp giao diện CSS (style.css):</h4>
-          <div style="display: flex; gap: 0.5rem;">
-            <a href="/api/view/style.css" target="_blank" class="btn btn-secondary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Mở tệp style.css để xem mã nguồn định dạng...', 'info')">
-              Xem code CSS
-            </a>
-            <a href="/api/download/style.css" class="btn btn-primary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Yêu cầu tải tệp style.css về máy...', 'success')">
-              Tải file CSS
-            </a>
-          </div>
+        <div class="table-responsive" style="margin-top: 1rem;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border-card); color: var(--text-muted);">
+                <th style="padding: 0.75rem 0.5rem;">Tên tệp</th>
+                <th style="padding: 0.75rem 0.5rem;">Định dạng</th>
+                <th style="padding: 0.75rem 0.5rem;">Dung lượng</th>
+                <th style="padding: 0.75rem 0.5rem; text-align: right;">Hành động</th>
+              </tr>
+            </thead>
+            <tbody id="test-files-body"></tbody>
+          </table>
         </div>
       </div>
 

@@ -604,3 +604,38 @@ document.getElementById('btn-fsm-reset').addEventListener('click', () => {
   textarea.setSelectionRange(0, 0);
   logToConsole('FSM Simulator has been reset.', 'info');
 });
+
+
+// --- Dynamic Render Test Files Table ---
+document.addEventListener('DOMContentLoaded', () => {
+  const testFiles = [
+    { name: "test.html", format: "HTML Document", size: "1.6 KB" },
+    { name: "test.css", format: "CSS Stylesheet", size: "7.0 KB" },
+    { name: "test.js", format: "JavaScript File", size: "16.9 KB" },
+    { name: "test.png", format: "PNG Image", size: "83.3 KB" },
+    { name: "test.pdf", format: "PDF Document", size: "33.7 MB" },
+    { name: "test.zip", format: "ZIP Archive", size: "53 KB" },
+    { name: "test.bin", format: "Binary File", size: "1.5 GB" }
+  ];
+
+  const tbody = document.getElementById('test-files-body');
+  if (tbody) {
+    tbody.innerHTML = ''; // Clear template
+    testFiles.forEach(file => {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = "1px solid rgba(255, 255, 255, 0.05)";
+      
+      tr.innerHTML = `
+        <td style="padding: 0.75rem 0.5rem; font-weight: bold; font-family: monospace;">${file.name}</td>
+        <td style="padding: 0.75rem 0.5rem;">${file.format}</td>
+        <td style="padding: 0.75rem 0.5rem; color: ${file.name.endsWith('.bin') ? '#ff4757' : 'var(--success)'}; font-weight: ${file.name.endsWith('.bin') ? 'bold' : 'normal'};">${file.size}</td>
+        <td style="padding: 0.75rem 0.5rem; text-align: right; display: flex; gap: 0.35rem; justify-content: flex-end;">
+          <a href="/api/view/${file.name}" target="_blank" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem; text-decoration: none;" onclick="logToConsole('Xem trực tiếp ${file.name}...', 'info')">Xem</a>
+          <a href="/api/download/${file.name}" class="btn btn-primary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem; text-decoration: none;" onclick="logToConsole('Đang tải ${file.name} (${file.size})...', 'success')">Tải về</a>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+    logToConsole('Đã khởi tạo danh sách file kiểm thử động từ JSON thành công.', 'success');
+  }
+});

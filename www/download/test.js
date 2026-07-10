@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kiểm Thử Tính Năng - WebServerVdt</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-container">
+        <div class="logo-icon">V</div>
+        <div class="logo-text">WebServerVdt</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 1.5rem;">
+        <nav style="margin-right: 0.5rem;">
+          <a href="index.html">Dashboard</a>
+          <a href="test_features.html" class="active">Tính năng</a>
+        </nav>
+        <button class="btn btn-secondary" id="btn-theme-toggle" style="padding: 0.5rem; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer;" title="Chuyển chế độ Sáng/Tối">
+          🌓
+        </button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="badge badge-info">Kiểm Thử Tương Tác</div>
+      <h1>Kiểm Thử Tính Năng</h1>
+      <p>Thực hiện các truy vấn đặc thù để kiểm thử các cơ chế nâng cao được lập trình trong nhân máy chủ C++.</p>
+    </section>
+
+    <div class="feature-grid">
+      <!-- 1. Heavy File Download Card -->
+      <div class="card">
+        <div class="badge badge-success">Zero-Copy Sendfile</div>
+        <h2>Tải File Nặng (1.5GB)</h2>
+        <p>Truyền dữ liệu trực tiếp từ đĩa cứng sang card mạng ở không gian nhân (Kernel Space) bằng <code>sendfile</code>, không tốn tài nguyên RAM của Server hay Client. Tải trực tiếp về thư mục Downloads của bạn.</p>
+        
+        <a href="/api/download/heavy_1.5gb.bin" class="btn btn-primary" style="width: 100%; text-decoration: none; margin-top: 1rem; text-align: center; display: block;" onclick="logToConsole('Bắt đầu tải tệp tin 1.5GB qua sendfile zero-copy. Trình duyệt đang thực hiện tải về đĩa cứng...', 'warning')">
+          Tải File 1.5GB Về Máy
+        </a>
+        <div id="download-status" class="preview-box" style="font-size:0.8rem; color:var(--text-muted);">
+          Gợi ý: Nhấn chuột để kích hoạt download gốc của trình duyệt (xem tiến độ tải ở mục Download của Chrome/Firefox).
+        </div>
+      </div>
+
+      <!-- 2. Light File Download Card -->
+      <div class="card">
+        <div class="badge badge-success">MIME & Content-Disposition</div>
+        <h2>Tải Tài Nguyên Nhẹ (CSS & PDF)</h2>
+        <p>So sánh sự khác biệt khi trình duyệt tự động hiển thị tài nguyên tĩnh và khi ép buộc trình duyệt tải xuống (Save As) bằng tham số <code>?download=true</code>.</p>
+        
+        <div style="margin-top: 1rem;">
+          <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-muted);">Tài liệu PDF (222.pdf):</h4>
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <a href="/api/view/222.pdf" target="_blank" class="btn btn-secondary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Mở tài liệu 222.pdf trên tab mới để xem trực tiếp...', 'info')">
+              Xem trực tiếp PDF
+            </a>
+            <a href="/api/download/222.pdf" class="btn btn-primary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Yêu cầu tải tệp 222.pdf về đĩa cứng...', 'success')">
+              Tải file PDF
+            </a>
+          </div>
+
+          <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-muted);">Hình ảnh JPEG (333.jpg):</h4>
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <a href="/api/view/333.jpg" target="_blank" class="btn btn-secondary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Mở hình ảnh 333.jpg trên tab mới để xem trực tiếp...', 'info')">
+              Xem trực tiếp Ảnh
+            </a>
+            <a href="/api/download/333.jpg" class="btn btn-primary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Yêu cầu tải tệp hình ảnh 333.jpg về đĩa cứng...', 'success')">
+              Tải file Ảnh
+            </a>
+          </div>
+
+          <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-muted);">Tệp giao diện CSS (style.css):</h4>
+          <div style="display: flex; gap: 0.5rem;">
+            <a href="/api/view/style.css" target="_blank" class="btn btn-secondary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Mở tệp style.css để xem mã nguồn định dạng...', 'info')">
+              Xem code CSS
+            </a>
+            <a href="/api/download/style.css" class="btn btn-primary" style="flex: 1; text-decoration: none; text-align: center; font-size: 0.85rem;" onclick="logToConsole('Yêu cầu tải tệp style.css về máy...', 'success')">
+              Tải file CSS
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. File Upload Card -->
+      <div class="card">
+        <div class="badge badge-success">Upload Parser</div>
+        <h2>Tải Lên File (POST Upload)</h2>
+        <p>Gửi file sử dụng chuẩn định dạng <code>multipart/form-data</code>. Trình phân tách nhị phân của C++ sẽ trích xuất tên file và ghi đè xuống thư mục lưu trữ.</p>
+        
+        <div class="form-group" style="margin-top: 1rem;">
+          <label>Chọn tệp tin bất kỳ:</label>
+          <input type="file" id="file-input" style="width: 100%;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem; line-height: 1.35;">
+            <strong>Hỗ trợ:</strong> .html, .htm, .css, .js, .json, .xml, .txt, .png, .jpg, .jpeg, .gif, .svg, .ico, .webp, .woff, .woff2, .ttf, .pdf, .zip<br>
+            <strong>Hạn mức dung lượng:</strong> &le; 50 KB
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="btn-upload" style="width: 100%;">Tải lên Server</button>
+        <div id="upload-status" class="preview-box">Chưa tải file lên. Thư mục lưu trữ: <code>/www/upload/</code></div>
+      </div>
+
+      <!-- 4. JSON Parser Card -->
+      <div class="card">
+        <div class="badge badge-success">Arena JSON Parser</div>
+        <h2>Phân Tích JSON Học Sinh</h2>
+        <p>Gửi payload danh sách học sinh thô định dạng JSON để phân tích tổng hợp. Bộ nhớ đệm phân đoạn (Arena Node Pool) C++ sẽ tự động giới hạn độ sâu cây để ngăn chặn DoS.</p>
+        
+        <div class="form-group" style="margin-top: 1rem;">
+          <label>Dữ liệu JSON đầu vào:</label>
+          <textarea id="json-input" style="width: 100%; height: 250px; font-family: monospace; font-size: 0.8rem; background: rgba(0,0,0,0.2); color: #fff; border: 1px solid var(--border-card); border-radius: 5px; padding: 0.5rem; box-sizing: border-box; resize: vertical;">[
+  {"name": "Nguyen Van A", "age": 20, "gpa": 3.85},
+  {"name": "Tran Thi B", "age": 21, "gpa": 3.92},
+  {"name": "Le Minh C", "age": 19, "gpa": 3.45}
+]</textarea>
+        </div>
+
+        <div style="display: flex; gap: 0.35rem; margin-bottom: 0.75rem;">
+          <button class="btn btn-secondary" id="btn-json-gen-100" style="flex: 1; font-size: 0.75rem; padding: 0.4rem 0.25rem;">Sinh 100</button>
+          <button class="btn btn-secondary" id="btn-json-gen-500" style="flex: 1; font-size: 0.75rem; padding: 0.4rem 0.25rem;">Sinh 500</button>
+          <button class="btn btn-secondary" id="btn-json-gen-2000" style="flex: 1; font-size: 0.75rem; padding: 0.4rem 0.25rem;">Sinh 2000</button>
+        </div>
+
+        <button class="btn btn-primary" id="btn-parse-json" style="width: 100%;">Phân tích cú pháp C++</button>
+        <div id="json-status" class="preview-box">Chưa chạy kiểm thử JSON.</div>
+      </div>
+
+      <!-- 5. Performance Stress Test Card -->
+      <div class="card">
+        <div class="badge badge-info">Performance Benchmark</div>
+        <h2>Bắn Requests Song Song</h2>
+        <p>Bắn song song nhiều yêu cầu HTTP GET đến trang tĩnh <code>index.html</code> để đo đạc tỷ lệ thành công và tốc độ phản hồi tức thời của Server.</p>
+        
+        <div style="display: flex; gap: 0.5rem; margin-top: 2rem;">
+          <button class="btn btn-primary" id="btn-stress-test-100" style="flex: 1;">Bắn 100 Requests</button>
+          <button class="btn btn-primary" id="btn-stress-test-200" style="flex: 1; background: var(--accent-gradient);">Bắn 200 Requests</button>
+        </div>
+        <div id="stress-test-status" class="preview-box">Chưa chạy kiểm thử hiệu năng.</div>
+      </div>
+
+      <!-- 6. FSM Parser Simulator Card -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="badge badge-info">FSM State Machine</div>
+        <h2>Trực Quan Hóa Thuật Toán FSM HTTP Parser</h2>
+        <p>Mô phỏng từng bước máy trạng thái phân đoạn (FSM) trong nhân C++ khi bóc tách chuỗi HTTP thô. Thầy cô có thể quan sát sự thay đổi trạng thái và vị trí con trỏ đọc thời gian thực.</p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
+          <div>
+            <div class="form-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                <label style="margin: 0;">Chuỗi HTTP Request thô:</label>
+                <div style="display: flex; gap: 0.25rem;">
+                  <button class="btn btn-secondary" id="btn-fsm-tpl-post" style="font-size: 0.65rem; padding: 0.2rem 0.4rem; cursor: pointer;" title="Mẫu POST chuẩn (Thành công)">POST</button>
+                  <button class="btn btn-secondary" id="btn-fsm-tpl-get" style="font-size: 0.65rem; padding: 0.2rem 0.4rem; cursor: pointer;" title="Mẫu GET chuẩn (Thành công)">GET</button>
+                  <button class="btn btn-secondary" id="btn-fsm-tpl-err-colon" style="font-size: 0.65rem; padding: 0.2rem 0.4rem; cursor: pointer;" title="Lỗi thiếu dấu ':' ở Header (Trạng thái ERROR)">Lỗi Colon</button>
+                  <button class="btn btn-secondary" id="btn-fsm-tpl-err-len" style="font-size: 0.65rem; padding: 0.2rem 0.4rem; cursor: pointer;" title="Lỗi thiếu body (Trạng thái ERROR)">Lỗi Body</button>
+                </div>
+              </div>
+              <textarea id="fsm-input" style="width: 100%; height: 250px; font-family: monospace; font-size: 0.85rem; background: rgba(0,0,0,0.3); color: #8aadf4; border: 1px solid var(--border-card); border-radius: 10px; padding: 0.75rem; box-sizing: border-box; resize: none; white-space: pre;">POST /api/parse_students HTTP/1.1
+Host: localhost:8081
+Content-Type: application/json
+Content-Length: 15
+
+{"name": "Hung"}</textarea>
+              <pre id="fsm-visual-text"></pre>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-primary" id="btn-fsm-start" style="flex: 1;">Chạy Mô Phỏng</button>
+              <button class="btn btn-secondary" id="btn-fsm-reset" style="padding: 0.75rem 1rem;">Reset</button>
+            </div>
+          </div>
+          
+          <div style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <label>Bảng Trạng Thái Máy FSM:</label>
+              <div id="fsm-states-container" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 0.5rem;">
+                <div class="fsm-state-node" id="state-START" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">1. START</div>
+                <div class="fsm-state-node" id="state-METHOD" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">2. METHOD</div>
+                <div class="fsm-state-node" id="state-URL" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">3. URL</div>
+                <div class="fsm-state-node" id="state-PROTOCOL" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">4. PROTOCOL</div>
+                <div class="fsm-state-node" id="state-PROTO_CR" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">5. PROTO_CR</div>
+                <div class="fsm-state-node" id="state-ST_HDR" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">6. ST_HDR</div>
+                <div class="fsm-state-node" id="state-ST_HDR_CR" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">7. ST_HDR_CR</div>
+                <div class="fsm-state-node" id="state-HDR_KEY" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">8. HDR_KEY</div>
+                <div class="fsm-state-node" id="state-HDR_VAL" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">9. HDR_VAL</div>
+                <div class="fsm-state-node" id="state-HDR_VAL_CR" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">10. HDR_VAL_CR</div>
+                <div class="fsm-state-node" id="state-ST_BODY" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">11. ST_BODY</div>
+                <div class="fsm-state-node" id="state-COMPLETE" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted);">12. COMPLETE</div>
+                <div class="fsm-state-node" id="state-ERROR" style="border: 1px solid var(--border-card); border-radius: 8px; padding: 0.4rem; text-align: center; font-size: 0.72rem; font-family: monospace; background: rgba(255,255,255,0.02); color: var(--text-muted); grid-column: span 3;">13. ERROR</div>
+              </div>
+            </div>
+
+            <div class="preview-box" id="fsm-log-box" style="margin-top: 1rem; max-height: 100px; font-family: monospace; font-size: 0.8rem; color: #a6da95;">
+              Nhấp "Chạy Mô Phỏng" để bắt đầu quan sát các bước bóc tách...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Console logs -->
+    <div class="console-section">
+      <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <h3 style="margin:0;">Nhật ký tương tác (Live Console)</h3>
+        <button class="btn btn-secondary" id="btn-clear-console" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;">Xóa logs</button>
+      </div>
+      <div id="console-logs" style="background:#1e1e2e; border: 1px solid var(--border-card); border-radius: 10px; height: 200px; overflow-y: auto; padding: 1rem; font-family: monospace; font-size: 0.85rem; line-height: 1.4;">
+      </div>
+    </div>
+  </div>
+
+  <script src="test_features.js"></script>
+</body>
+</html>
