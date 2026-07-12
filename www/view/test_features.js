@@ -615,7 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
     { name: "test.png", format: "PNG Image", size: "83.3 KB" },
     { name: "test.pdf", format: "PDF Document", size: "33.7 MB" },
     { name: "test.zip", format: "ZIP Archive", size: "53 KB" },
-    { name: "test.bin", format: "Binary File", size: "1.5 GB" }
+    { name: "test.bin", format: "Binary File", size: "5.0 GB" }
   ];
 
   const tbody = document.getElementById('test-files-body');
@@ -625,12 +625,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const tr = document.createElement('tr');
       tr.style.borderBottom = "1px solid rgba(255, 255, 255, 0.05)";
       
+      const viewableExtensions = ['.html', '.css', '.js', '.png', '.jpg', '.jpeg', '.pdf', '.json', '.txt'];
+      const isViewable = viewableExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+      const viewButton = isViewable 
+        ? `<a href="/api/view/${file.name}" target="_blank" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem; text-decoration: none;" onclick="logToConsole('Xem trực tiếp ${file.name}...', 'info')">Xem</a>`
+        : '';
+
       tr.innerHTML = `
         <td style="padding: 0.75rem 0.5rem; font-weight: bold; font-family: monospace;">${file.name}</td>
         <td style="padding: 0.75rem 0.5rem;">${file.format}</td>
         <td style="padding: 0.75rem 0.5rem; color: ${file.name.endsWith('.bin') ? '#ff4757' : 'var(--success)'}; font-weight: ${file.name.endsWith('.bin') ? 'bold' : 'normal'};">${file.size}</td>
         <td style="padding: 0.75rem 0.5rem; text-align: right; display: flex; gap: 0.35rem; justify-content: flex-end;">
-          <a href="/api/view/${file.name}" target="_blank" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem; text-decoration: none;" onclick="logToConsole('Xem trực tiếp ${file.name}...', 'info')">Xem</a>
+          ${viewButton}
           <a href="/api/download/${file.name}" class="btn btn-primary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem; text-decoration: none;" onclick="logToConsole('Đang tải ${file.name} (${file.size})...', 'success')">Tải về</a>
         </td>
       `;

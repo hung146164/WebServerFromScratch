@@ -63,7 +63,7 @@ jobs:
               --ulimit nofile=65535:65535 \
               --log-driver none \
               -v /root/www_download/heavy_file_50mb.bin:/app/www/download/heavy_file_50mb.bin\
-              -v /root/www_download/heavy_1.5gb.bin:/app/www/download/heavy_1.5gb.bin \
+              -v /root/www_download/heavy_5gb.bin:/app/www/download/test.bin \
               -v /root/uploads:/app/www/upload \
               --restart always \
               ghcr.io/$REPO_LOWER:latest
