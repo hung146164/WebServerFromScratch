@@ -110,6 +110,42 @@ void Http::Router::Dispatch(int fd, const HttpRequest &req)
         Nếu server không trả lời hoặc trả lời sai,
         trình duyệt hủy request thật luôn, không gửi nữa
     */
+
+    std::string db;
+    if (req.method == HttpMethod::GET)
+    {
+        db += "Method: GET\n";
+    }
+    else if (req.method == HttpMethod::POST)
+    {
+        db += "Method: POST\n";
+    }
+    else if (req.method == HttpMethod::PUT)
+    {
+        db += "Method: PUT\n";
+    }
+    else if (req.method == HttpMethod::HEAD)
+    {
+        db += "Method: HEAD\n";
+    }
+    else if (req.method == HttpMethod::OPTIONS)
+    {
+        db += "Method: OPTIONS\n";
+    }
+    else if (req.method == HttpMethod::DELETE)
+    {
+        db += "Method: DELETE\n";
+    }
+    else
+    {
+        db += "Method: UNKNOWN\n";
+    }
+
+    db += "URL: " + (std::string)req.http_url + "\n";
+    db += "Protocol : " + (std::string)req.http_protocol + "\n";
+
+    std::cout << db << '\n';
+
     if (req.method == HttpMethod::OPTIONS)
     {
         std::string res =
